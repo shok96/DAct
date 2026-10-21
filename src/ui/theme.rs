@@ -1,18 +1,9 @@
 use eframe::egui::{self, Color32, FontFamily, FontId, Stroke};
 
-/// Copper on dark frost. Overlay windows use DWM acrylic behind these alphas.
+/// Copper on dark. Overlay HWNDs are clipped; unpainted pixels stay clear.
 pub const INK: Color32 = Color32::from_rgb(11, 12, 16);
 pub const PANEL: Color32 = Color32::from_rgb(20, 22, 28);
 pub const LINE: Color32 = Color32::from_rgb(42, 46, 56);
-pub fn glass() -> Color32 {
-    Color32::from_rgba_unmultiplied(255, 255, 255, 28)
-}
-pub fn glass_deep() -> Color32 {
-    Color32::from_rgba_unmultiplied(18, 20, 26, 72)
-}
-pub fn glass_edge() -> Color32 {
-    Color32::from_rgba_unmultiplied(255, 255, 255, 70)
-}
 pub const COPPER: Color32 = Color32::from_rgb(212, 137, 74);
 pub const COPPER_HOT: Color32 = Color32::from_rgb(240, 176, 106);
 pub const EMBER: Color32 = Color32::from_rgb(232, 93, 58);
@@ -21,10 +12,6 @@ pub const TEXT_DIM: Color32 = Color32::from_rgb(154, 145, 134);
 pub const GOOD: Color32 = Color32::from_rgb(124, 184, 154);
 pub const BAD: Color32 = Color32::from_rgb(224, 122, 106);
 pub const HUB: Color32 = Color32::from_rgb(16, 17, 22);
-
-pub fn hub_glass() -> Color32 {
-    Color32::from_rgba_unmultiplied(18, 20, 26, 96)
-}
 
 pub fn apply(ctx: &egui::Context) {
     let mut style = (*ctx.style()).clone();

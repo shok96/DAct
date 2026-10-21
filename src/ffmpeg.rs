@@ -12,6 +12,11 @@ use crate::settings::Settings;
 #[cfg(windows)]
 const FFMPEG_ZIP: &str = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip";
 
+/// Pinned release. The archive is a flat zip of `ffmpeg` and `ffprobe`
+/// (plus `ffplay`, which is ignored). See https://github.com/Tyrrrz/FFmpegBin
+#[cfg(target_os = "macos")]
+const FFMPEG_BIN_VERSION: &str = "9.0.2";
+
 /// Local FFmpeg only. Download happens only when the user asks.
 #[derive(Debug, Clone)]
 pub struct Ffmpeg {
@@ -185,45 +190,108 @@ pub fn bundled_exe() -> PathBuf {
     bundled_dir().join(named)
 }
 
-/// User-started install into %LOCALAPPDATA%\DAct\ffmpeg. Never runs on launch.
+/// User-started install into the per-user DAct data folder. Never runs on launch.
 pub fn install() -> Result<PathBuf> {
-    #[cfg(windows)]
-    {
-        install_windows()
-    }
-    #[cfg(not(windows))]
-    {
-        Err(DactError::user(
-            "Install FFmpeg with your package manager, then set the path in Settings.",
-        ))
-    }
-}
-
-#[cfg(windows)]
-fn install_windows() -> Result<PathBuf> {
     let dest = bundled_exe();
     if dest.is_file() {
         return Ok(dest);
     }
     let dir = bundled_dir();
     fs::create_dir_all(&dir).map_err(DactError::from_io)?;
-    let zip_path = data_dir().join("ffmpeg-essentials.zip");
-    download(FFMPEG_ZIP, &zip_path)?;
-    extract_ffmpeg(&zip_path, &dir)?;
-    let _ = fs::remove_file(&zip_path);
-    if dest.is_file() {
-        Ok(dest)
+    let url = ffmpeg_archive_url()?;
+    let archive_name = if url.ends_with(".tar.xz") {
+        "ffmpeg-download.tar.xz"
     } else {
+        "ffmpeg-download.zip"
+    };
+    let archive_path = data_dir().join(archive_name);
+    let fetched = download(&url, &archive_path);
+    if let Err(err) = fetched {
+        let _ = fs::remove_file(&archive_path);
+        return Err(err);
+    }
+    let extracted = if url.ends_with(".tar.xz") {
+        extract_tar_xz(&archive_path, &dir)
+    } else {
+        extract_tools(&archive_path, &dir)
+    };
+    let _ = fs::remove_file(&archive_path);
+    extracted?;
+    if !dest.is_file() {
+        return Err(DactError::user(
+            "Downloaded FFmpeg, but the ffmpeg binary was not in the archive.",
+        ));
+    }
+    mark_tool(&dest)?;
+    let probe = dest.with_file_name(probe_name());
+    if probe.is_file() {
+        mark_tool(&probe)?;
+    }
+    Ok(dest)
+}
+
+fn ffmpeg_archive_url() -> Result<String> {
+    #[cfg(windows)]
+    {
+        Ok(FFMPEG_ZIP.to_string())
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let arch = match std::env::consts::ARCH {
+            "x86_64" => "x64",
+            "aarch64" => "arm64",
+            other => {
+                return Err(DactError::user(format!(
+                    "No FFmpeg build for this Mac ({other}). Install ffmpeg yourself and set the path in Settings."
+                )));
+            }
+        };
+        Ok(format!(
+            "https://github.com/Tyrrrz/FFmpegBin/releases/download/{FFMPEG_BIN_VERSION}/ffmpeg-osx-{arch}.zip"
+        ))
+    }
+    #[cfg(target_os = "linux")]
+    {
+        // GPL static builds. The rolling `latest` tag keeps this file name.
+        // Linked against an older glibc than a binary built on current Ubuntu.
+        let name = match std::env::consts::ARCH {
+            "x86_64" => "ffmpeg-n9.0-latest-linux64-gpl-9.0.tar.xz",
+            "aarch64" => "ffmpeg-n9.0-latest-linuxarm64-gpl-9.0.tar.xz",
+            other => {
+                return Err(DactError::user(format!(
+                    "No FFmpeg build for this Linux ({other}). Install ffmpeg yourself and set the path in Settings."
+                )));
+            }
+        };
+        Ok(format!(
+            "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/{name}"
+        ))
+    }
+    #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
+    {
+        let _ = ();
         Err(DactError::user(
-            "Downloaded FFmpeg, but ffmpeg.exe was not in the archive.",
+            "No FFmpeg download for this system. Install ffmpeg yourself and set the path in Settings.",
         ))
     }
 }
 
-#[cfg(windows)]
+fn probe_name() -> &'static str {
+    if cfg!(windows) {
+        "ffprobe.exe"
+    } else {
+        "ffprobe"
+    }
+}
+
 fn download(url: &str, dest: &Path) -> Result<()> {
-    let resp = ureq::get(url)
-        .timeout(std::time::Duration::from_secs(180))
+    let agent = ureq::AgentBuilder::new()
+        .timeout(std::time::Duration::from_secs(600))
+        .redirects(8)
+        .build();
+    let resp = agent
+        .get(url)
+        .set("User-Agent", "DAct")
         .call()
         .map_err(|e| DactError::user(format!("Could not download FFmpeg: {e}")))?;
     let mut file = File::create(dest).map_err(DactError::from_io)?;
@@ -232,11 +300,20 @@ fn download(url: &str, dest: &Path) -> Result<()> {
     Ok(())
 }
 
-#[cfg(windows)]
-fn extract_ffmpeg(zip_path: &Path, dest_dir: &Path) -> Result<()> {
+fn tool_file_name(entry_name: &str) -> Option<String> {
+    let name = entry_name.replace('\\', "/");
+    let file_name = name.rsplit('/').next().unwrap_or("");
+    match file_name {
+        "ffmpeg" | "ffprobe" | "ffmpeg.exe" | "ffprobe.exe" => Some(file_name.to_string()),
+        _ => None,
+    }
+}
+
+fn extract_tools(zip_path: &Path, dest_dir: &Path) -> Result<()> {
     let file = File::open(zip_path).map_err(DactError::from_io)?;
     let mut archive = zip::ZipArchive::new(file)
         .map_err(|e| DactError::user(format!("Could not open FFmpeg archive: {e}")))?;
+    let mut staged: Vec<(PathBuf, PathBuf)> = Vec::new();
     let mut found = false;
     for i in 0..archive.len() {
         let mut entry = archive
@@ -245,25 +322,133 @@ fn extract_ffmpeg(zip_path: &Path, dest_dir: &Path) -> Result<()> {
         if !entry.is_file() {
             continue;
         }
-        let name = entry.name().replace('\\', "/");
-        let file_name = name.rsplit('/').next().unwrap_or("");
-        if file_name != "ffmpeg.exe" && file_name != "ffprobe.exe" {
+        let Some(file_name) = tool_file_name(entry.name()) else {
             continue;
+        };
+        let part = dest_dir.join(format!(".{file_name}.part"));
+        let final_path = dest_dir.join(&file_name);
+        let copied = (|| {
+            let mut out = File::create(&part).map_err(DactError::from_io)?;
+            std::io::copy(&mut entry, &mut out).map_err(DactError::from_io)?;
+            Ok(())
+        })();
+        if let Err(err) = copied {
+            let _ = fs::remove_file(&part);
+            for (part, _) in &staged {
+                let _ = fs::remove_file(part);
+            }
+            return Err(err);
         }
-        let out = dest_dir.join(file_name);
-        let mut dest = File::create(&out).map_err(DactError::from_io)?;
-        std::io::copy(&mut entry, &mut dest).map_err(DactError::from_io)?;
-        if file_name == "ffmpeg.exe" {
+        if file_name == "ffmpeg" || file_name == "ffmpeg.exe" {
             found = true;
         }
+        staged.push((part, final_path));
     }
-    if found {
-        Ok(())
-    } else {
-        Err(DactError::user(
-            "The FFmpeg archive did not contain ffmpeg.exe.",
-        ))
+    if !found {
+        for (part, _) in &staged {
+            let _ = fs::remove_file(part);
+        }
+        return Err(DactError::user(
+            "The FFmpeg archive did not contain the ffmpeg binary.",
+        ));
     }
+    for (part, final_path) in staged {
+        fs::rename(&part, &final_path).map_err(DactError::from_io)?;
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn extract_tar_xz(archive_path: &Path, dest_dir: &Path) -> Result<()> {
+    let file = File::open(archive_path).map_err(DactError::from_io)?;
+    let decoder = xz2::read::XzDecoder::new(file);
+    let mut archive = tar::Archive::new(decoder);
+    let entries = archive
+        .entries()
+        .map_err(|e| DactError::user(format!("Could not read FFmpeg archive: {e}")))?;
+    let mut staged: Vec<(PathBuf, PathBuf)> = Vec::new();
+    let mut found = false;
+    for entry in entries {
+        let mut entry =
+            entry.map_err(|e| DactError::user(format!("Could not read FFmpeg archive: {e}")))?;
+        if !entry.header().entry_type().is_file() {
+            continue;
+        }
+        let file_name = {
+            let path = entry
+                .path()
+                .map_err(|e| DactError::user(format!("Could not read FFmpeg archive: {e}")))?;
+            path.file_name()
+                .and_then(|s| s.to_str())
+                .map(|s| s.to_string())
+        };
+        let Some(file_name) = file_name else {
+            continue;
+        };
+        if file_name != "ffmpeg" && file_name != "ffprobe" {
+            continue;
+        }
+        let part = dest_dir.join(format!(".{file_name}.part"));
+        let final_path = dest_dir.join(&file_name);
+        let copied = (|| {
+            let mut out = File::create(&part).map_err(DactError::from_io)?;
+            std::io::copy(&mut entry, &mut out).map_err(DactError::from_io)?;
+            Ok(())
+        })();
+        if let Err(err) = copied {
+            let _ = fs::remove_file(&part);
+            for (part, _) in &staged {
+                let _ = fs::remove_file(part);
+            }
+            return Err(err);
+        }
+        if file_name == "ffmpeg" {
+            found = true;
+        }
+        staged.push((part, final_path));
+    }
+    if !found {
+        for (part, _) in &staged {
+            let _ = fs::remove_file(part);
+        }
+        return Err(DactError::user(
+            "The FFmpeg archive did not contain the ffmpeg binary.",
+        ));
+    }
+    for (part, final_path) in staged {
+        fs::rename(&part, &final_path).map_err(DactError::from_io)?;
+    }
+    Ok(())
+}
+
+#[cfg(not(target_os = "linux"))]
+fn extract_tar_xz(_archive_path: &Path, _dest_dir: &Path) -> Result<()> {
+    Err(DactError::user(
+        "This FFmpeg archive is only unpacked on Linux.",
+    ))
+}
+
+fn mark_tool(path: &Path) -> Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(path).map_err(DactError::from_io)?.permissions();
+        perms.set_mode(perms.mode() | 0o755);
+        fs::set_permissions(path, perms).map_err(DactError::from_io)?;
+        #[cfg(target_os = "macos")]
+        {
+            let _ = Command::new("/usr/bin/xattr")
+                .args(["-d", "com.apple.quarantine"])
+                .arg(path)
+                .status();
+            let _ = Command::new("/usr/bin/codesign")
+                .args(["--force", "--sign", "-"])
+                .arg(path)
+                .status();
+        }
+    }
+    let _ = path;
+    Ok(())
 }
 
 fn candidates(settings: &Settings) -> Vec<PathBuf> {
@@ -307,4 +492,46 @@ fn candidates(settings: &Settings) -> Vec<PathBuf> {
         out.push(PathBuf::from("/usr/local/bin/ffmpeg"));
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tool_names_ignore_directories_and_extra_files() {
+        assert_eq!(tool_file_name("bin/ffmpeg").as_deref(), Some("ffmpeg"));
+        assert_eq!(tool_file_name("ffmpeg.exe").as_deref(), Some("ffmpeg.exe"));
+        assert_eq!(
+            tool_file_name(r"ffmpeg-essentials\bin\ffprobe.exe").as_deref(),
+            Some("ffprobe.exe")
+        );
+        assert_eq!(tool_file_name("ffplay"), None);
+        assert_eq!(tool_file_name("readme.txt"), None);
+    }
+
+    #[test]
+    fn extract_keeps_only_ffmpeg_and_ffprobe() {
+        let dir = tempfile::tempdir().unwrap();
+        let zip_path = dir.path().join("ffmpeg.zip");
+        {
+            let file = File::create(&zip_path).unwrap();
+            let mut writer = zip::ZipWriter::new(file);
+            let opts = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
+            writer.start_file("build/bin/ffmpeg", opts).unwrap();
+            std::io::Write::write_all(&mut writer, b"ffmpeg-bytes").unwrap();
+            writer.start_file("build/bin/ffprobe", opts).unwrap();
+            std::io::Write::write_all(&mut writer, b"ffprobe-bytes").unwrap();
+            writer.start_file("build/bin/ffplay", opts).unwrap();
+            std::io::Write::write_all(&mut writer, b"ffplay-bytes").unwrap();
+            writer.finish().unwrap();
+        }
+        let out = dir.path().join("out");
+        fs::create_dir_all(&out).unwrap();
+        extract_tools(&zip_path, &out).unwrap();
+        assert_eq!(fs::read(out.join("ffmpeg")).unwrap(), b"ffmpeg-bytes");
+        assert_eq!(fs::read(out.join("ffprobe")).unwrap(), b"ffprobe-bytes");
+        assert!(!out.join("ffplay").exists());
+    }
 }

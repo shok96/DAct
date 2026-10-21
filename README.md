@@ -96,7 +96,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 cargo build --release
 ```
 
-Audio and video need a separate FFmpeg install, for example `brew install ffmpeg`. Point **Settings** at the binary, or leave it on `PATH`. The in-app download button is Windows-only.
+Audio and video need FFmpeg. **Get FFmpeg** downloads it into the user data folder. A copy already on `PATH`, or a path set in **Settings**, is used instead.
 
 ### Linux
 
@@ -124,7 +124,7 @@ sudo pacman -S --needed base-devel pkgconf gtk3 xdotool libayatana-appindicator
 
 `libappindicator-gtk3` is the alternative to `libayatana-appindicator` when the Ayatana package is absent.
 
-At run time the process loads OpenGL, X11 or Wayland, and the indicator library. The file dialog goes through `xdg-desktop-portal`, so a desktop portal backend has to be installed (`xdg-desktop-portal` and the backend for the session, such as `xdg-desktop-portal-gtk` or `xdg-desktop-portal-gnome`). Install FFmpeg from the distribution and set the path in **Settings**, or put `ffmpeg` on `PATH`. The in-app download button is Windows-only.
+At run time the process loads OpenGL, X11 or Wayland, and the indicator library. The file dialog goes through `xdg-desktop-portal`, so a desktop portal backend has to be installed (`xdg-desktop-portal` and the backend for the session, such as `xdg-desktop-portal-gtk` or `xdg-desktop-portal-gnome`). Audio and video need FFmpeg. **Get FFmpeg** downloads it into the user data folder. A copy already on `PATH`, or a path set in **Settings**, is used instead.
 
 ### Check
 
@@ -139,7 +139,19 @@ cargo run --release -- --selftest
 
 Search order: the path in settings, then the copy downloaded by the app, then `ffmpeg` on `PATH`, then a short list of common install locations (`~/bin`, `~/ffmpeg/bin`, WinGet links, `C:\ffmpeg\bin`, `/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin`).
 
-On Windows, **Get FFmpeg** downloads the essentials build from <https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip> and extracts `ffmpeg.exe` and `ffprobe.exe` into `%LOCALAPPDATA%\DAct\ffmpeg`. Nothing is downloaded at startup. That build is GPL, because it includes encoders such as libx264 and LAME. It is not part of this repository, and the MIT license on DAct does not cover it. Shipping an installer that contains that binary means complying with the FFmpeg license separately.
+**Get FFmpeg** runs only after that button is pressed, or when a conversion needs FFmpeg and none is installed. The binaries are written to the user data folder (`%LOCALAPPDATA%\DAct\ffmpeg` on Windows, `~/Library/Application Support/DAct/ffmpeg` on macOS, `~/.local/share/DAct/ffmpeg` on Linux) and marked executable. On macOS the quarantine attribute is removed and the file is ad-hoc signed so Gatekeeper will run a binary this app just downloaded.
+
+| System | Archive |
+|---|---|
+| Windows | essentials build, <https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip> |
+| macOS x86_64 | <https://github.com/Tyrrrz/FFmpegBin/releases/download/9.0.2/ffmpeg-osx-x64.zip> |
+| macOS arm64 | <https://github.com/Tyrrrz/FFmpegBin/releases/download/9.0.2/ffmpeg-osx-arm64.zip> |
+| Linux x86_64 | <https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n9.0-latest-linux64-gpl-9.0.tar.xz> |
+| Linux arm64 | <https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n9.0-latest-linuxarm64-gpl-9.0.tar.xz> |
+
+Other CPU architectures are not downloaded. Install `ffmpeg` from the distribution and set the path in **Settings**.
+
+Each archive is unpacked for `ffmpeg` and `ffprobe` only. The Windows essentials build and the Linux BtbN builds are GPL (libx264, LAME, and on Linux also VP9 and Opus). The macOS zip is the FFmpegBin 9.0.2 package. None of these binaries are in this repository, and the MIT license on DAct does not cover them. An installer that ships one of them has to comply with that build's license on its own.
 
 ## License
 

@@ -130,6 +130,12 @@ impl ToastStack {
         self.items.is_empty()
     }
 
+    pub fn needs_spin(&self) -> bool {
+        self.items
+            .iter()
+            .any(|t| matches!(t.kind, ToastKind::Working { .. }))
+    }
+
     pub fn tick(&mut self) {
         self.items
             .retain(|t| t.born.elapsed() < t.ttl() && !t.closing);
@@ -161,12 +167,11 @@ fn draw_toast(ui: &mut egui::Ui, toast: &mut Toast, idx: usize) {
     let h = toast.height();
     let (rect, _) = ui.allocate_exact_size(Vec2::new(CARD_W, h), Sense::click());
     let painter = ui.painter();
-    painter.rect_filled(rect, CornerRadius::same(16), theme::glass_deep());
-    painter.rect_filled(rect, CornerRadius::same(16), theme::glass());
+    painter.rect_filled(rect, CornerRadius::same(16), theme::PANEL);
     painter.rect_stroke(
         rect,
         CornerRadius::same(16),
-        Stroke::new(1.1_f32, theme::glass_edge()),
+        Stroke::new(1.0_f32, theme::LINE),
         egui::StrokeKind::Inside,
     );
 
@@ -313,7 +318,7 @@ fn draw_toast(ui: &mut egui::Ui, toast: &mut Toast, idx: usize) {
 fn pill(ui: &mut egui::Ui, label: &str) -> egui::Response {
     ui.add(
         egui::Button::new(RichText::new(label).color(theme::TEXT).size(12.0))
-            .fill(egui::Color32::from_rgba_unmultiplied(255, 255, 255, 28))
+            .fill(theme::LINE)
             .corner_radius(14.0)
             .min_size(Vec2::new(0.0, 26.0)),
     )

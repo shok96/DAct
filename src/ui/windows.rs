@@ -89,7 +89,7 @@ impl SettingsWin {
                 ui.add_space(8.0);
                 ui.label(RichText::new("FFmpeg path (optional)").color(theme::TEXT_DIM).size(12.0));
                 ui.label(
-                    RichText::new("Local binary only. Get FFmpeg on the home screen copies the official Windows build into this user folder — never on launch.")
+                    RichText::new("Local binary only. Get FFmpeg copies a static build into this user folder. Nothing is downloaded at launch.")
                         .color(theme::TEXT_DIM)
                         .size(11.0),
                 );

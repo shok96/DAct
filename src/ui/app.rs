@@ -57,6 +57,8 @@ pub struct DactApp {
     tray_hinted: bool,
     restore_size: egui::Vec2,
     restore_pos: Option<egui::Pos2>,
+    toast_live: bool,
+    radial_live: bool,
 }
 
 impl DactApp {
@@ -108,6 +110,8 @@ impl DactApp {
             tray_hinted: false,
             restore_size: egui::vec2(980.0, 680.0),
             restore_pos: None,
+            toast_live: false,
+            radial_live: false,
         };
         if !initial_files.is_empty() {
             app.set_queue(initial_files, &cc.egui_ctx);
@@ -231,7 +235,7 @@ impl DactApp {
         }
         let toast = self.toasts.working(
             "Getting FFmpeg…",
-            "Official Windows build into this user folder.",
+            "Downloading a static build into this user folder.",
         );
         let tx = self.job_tx.clone();
         std::thread::Builder::new()
@@ -381,7 +385,6 @@ impl DactApp {
 
 impl eframe::App for DactApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        theme::apply(ctx);
         let dt = self.last_tick.elapsed().as_secs_f32().min(0.05);
         self.last_tick = Instant::now();
 
@@ -621,11 +624,25 @@ impl eframe::App for DactApp {
         }
 
         self.toasts.tick();
-        if !self.toasts.is_empty() {
+        let toast_id = ViewportId::from_hash_of("toasts");
+        let radial_id = ViewportId::from_hash_of("radial");
+        if self.toasts.is_empty() {
+            if self.toast_live {
+                ctx.send_viewport_cmd_to(toast_id, ViewportCommand::Visible(false));
+                ctx.send_viewport_cmd_to(
+                    toast_id,
+                    ViewportCommand::OuterPosition(egui::pos2(-32000.0, -32000.0)),
+                );
+                ctx.send_viewport_cmd_to(toast_id, ViewportCommand::InnerSize(egui::vec2(1.0, 1.0)));
+                #[cfg(windows)]
+                crate::ui::win_input::hide_toast_overlay();
+                self.toast_live = false;
+            }
+        } else {
             let size = self.toasts.viewport_size();
             let pos = crate::ui::notice_anchor(size, ctx.pixels_per_point());
             ctx.show_viewport_immediate(
-                ViewportId::from_hash_of("toasts"),
+                toast_id,
                 ViewportBuilder::default()
                     .with_title(crate::ui::toast_overlay_title())
                     .with_decorations(false)
@@ -660,19 +677,28 @@ impl eframe::App for DactApp {
                         );
                         crate::ui::win_input::harden_toast_overlay(&self.toasts.card_heights());
                     }
-                    egui::CentralPanel::default()
-                        .frame(egui::Frame::NONE)
+                    egui::Area::new(egui::Id::new("dact-toasts"))
+                        .fixed_pos(egui::pos2(0.0, 0.0))
+                        .order(egui::Order::Foreground)
                         .show(ctx, |ui| {
                             self.toasts.show_list(ui);
                         });
                 },
             );
+            self.toast_live = true;
         }
 
-        if self.radial.visible {
+        if !self.radial.visible {
+            if self.radial_live {
+                ctx.send_viewport_cmd_to(radial_id, ViewportCommand::Visible(false));
+                #[cfg(windows)]
+                crate::ui::win_input::hide_radial_overlay();
+                self.radial_live = false;
+            }
+        } else {
             let pos = self.radial.pos - egui::vec2(SIZE * 0.5, SIZE * 0.5);
             ctx.show_viewport_immediate(
-                ViewportId::from_hash_of("radial"),
+                radial_id,
                 ViewportBuilder::default()
                     .with_title(crate::ui::radial_overlay_title())
                     .with_decorations(false)
@@ -692,9 +718,11 @@ impl eframe::App for DactApp {
                     });
                     #[cfg(windows)]
                     crate::ui::win_input::harden_radial_overlay();
-                    egui::CentralPanel::default()
-                        .frame(egui::Frame::NONE)
+                    egui::Area::new(egui::Id::new("dact-dial"))
+                        .fixed_pos(egui::pos2(0.0, 0.0))
+                        .order(egui::Order::Foreground)
                         .show(ctx, |ui| {
+                            ui.set_min_size(egui::vec2(SIZE, SIZE));
                             if let Some((item, paths, _)) = self.radial.show(ui, dt) {
                                 self.activate(item, paths);
                             }
@@ -706,6 +734,7 @@ impl eframe::App for DactApp {
                     }
                 },
             );
+            self.radial_live = true;
         }
 
         if let Some(activate) = pending_hide {
@@ -724,7 +753,15 @@ impl eframe::App for DactApp {
             }
         }
 
-        ctx.request_repaint_after(Duration::from_millis(16));
+        if self.radial.visible {
+            ctx.request_repaint_after(Duration::from_millis(16));
+        } else if self.toasts.needs_spin() {
+            ctx.request_repaint_after(Duration::from_millis(50));
+        } else if !self.toasts.is_empty() {
+            ctx.request_repaint_after(Duration::from_millis(250));
+        } else {
+            ctx.request_repaint_after(Duration::from_millis(300));
+        }
     }
 
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {

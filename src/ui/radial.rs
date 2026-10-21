@@ -242,32 +242,22 @@ fn paint_dial(painter: &egui::Painter, center: Pos2, menu: &RadialMenu, scale: f
     let items = menu.items();
     let n = items.len();
 
-    painter.circle_filled(
-        center + Vec2::new(0.0, 8.0),
-        (R_OUT + 10.0) * scale,
-        Color32::from_black_alpha((50.0 * fade) as u8),
-    );
-    painter.circle_filled(
-        center,
-        (R_OUT + 8.0) * scale,
-        theme::glass_deep().gamma_multiply(fade),
-    );
     painter.circle_stroke(
         center,
         (R_OUT + 8.0) * scale,
-        Stroke::new(1.2_f32, theme::glass_edge().gamma_multiply(fade)),
+        Stroke::new(1.2_f32, theme::COPPER.gamma_multiply(0.55 * fade)),
     );
 
     // Engraved ticks
-    for i in 0..72 {
-        let a = i as f32 / 72.0 * TAU - TAU * 0.25;
-        let inner = if i % 6 == 0 { R_OUT + 6.0 } else { R_OUT + 10.0 };
+    for i in 0..24 {
+        let a = i as f32 / 24.0 * TAU - TAU * 0.25;
+        let inner = if i % 3 == 0 { R_OUT + 6.0 } else { R_OUT + 10.0 };
         let p0 = polar(center, inner * scale, a);
         let p1 = polar(center, (R_OUT + 14.0) * scale, a);
         painter.line_segment(
             [p0, p1],
             Stroke::new(
-                if i % 6 == 0 { 1.4_f32 } else { 0.8_f32 },
+                if i % 3 == 0 { 1.4_f32 } else { 0.8_f32 },
                 theme::LINE.gamma_multiply(fade * 0.9),
             ),
         );
@@ -286,9 +276,9 @@ fn paint_dial(painter: &egui::Painter, center: Pos2, menu: &RadialMenu, scale: f
         let (a0, a1) = slice_angles(n, i);
         let grow = 1.0 + 0.045 * spring;
         let fill = lerp_color(
-            theme::glass(),
-            Color32::from_rgba_unmultiplied(212, 137, 74, 150),
-            0.12 + 0.78 * spring,
+            theme::PANEL,
+            theme::COPPER,
+            0.08 + 0.82 * spring,
         )
         .gamma_multiply(fade);
         let stroke = Stroke::new(
@@ -325,7 +315,7 @@ fn paint_dial(painter: &egui::Painter, center: Pos2, menu: &RadialMenu, scale: f
     }
 
     let hub_r = (R_HUB + 3.0 * menu.hub_spring) * scale;
-    painter.circle_filled(center, hub_r + 3.0, theme::hub_glass().gamma_multiply(fade));
+    painter.circle_filled(center, hub_r + 3.0, theme::HUB.gamma_multiply(fade));
     painter.circle_stroke(
         center,
         hub_r,

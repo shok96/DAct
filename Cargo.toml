@@ -33,6 +33,12 @@ ureq = { version = "2", default-features = false, features = ["tls"] }
 which = "7"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+# BtbN ships a .tar.xz. `static` builds liblzma in-tree, so the app does not
+# need liblzma-dev on the machine that compiles it.
+tar = "0.4"
+xz2 = { version = "0.1", features = ["static"] }
+
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
 windows = { version = "0.61", features = [
