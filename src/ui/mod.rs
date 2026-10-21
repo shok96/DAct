@@ -11,6 +11,9 @@ pub mod windows;
 #[cfg(windows)]
 pub mod win_input;
 
+#[cfg(target_os = "macos")]
+pub mod mac_input;
+
 pub fn radial_overlay_title() -> &'static str {
     #[cfg(windows)]
     {
@@ -29,7 +32,7 @@ pub fn toast_overlay_title() -> &'static str {
     }
     #[cfg(not(windows))]
     {
-        "DAct Notices"
+        crate::i18n::toast_overlay()
     }
 }
 

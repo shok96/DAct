@@ -21,7 +21,8 @@ pub const AUDIO_EXTS: &[&str] = &[
 ];
 pub const VIDEO_EXTS: &[&str] = &[
     "mp4", "mov", "mkv", "webm", "avi", "m4v", "wmv", "mpg", "mpeg", "flv", "ts", "mts", "m2ts",
-    "3gp", "asf", "vob",
+    "3gp", "asf", "vob", "qt", "dv", "hevc", "mxf", "3g2", "f4v", "ogv", "m2v", "m2t", "divx",
+    "mod", "tod",
 ];
 
 /// `Some(cat)` when every path is the same convertible type.
@@ -79,6 +80,8 @@ mod tests {
         assert_eq!(category("notes.md"), Some(Category::Text));
         assert_eq!(category("song.flac"), Some(Category::Audio));
         assert_eq!(category("clip.mkv"), Some(Category::Video));
+        assert_eq!(category("clip.hevc"), Some(Category::Video));
+        assert_eq!(category("tape.dv"), Some(Category::Video));
         assert_eq!(category("doc.pdf"), Some(Category::Pdf));
         assert_eq!(category("x.exe"), None);
         assert_eq!(uniform(&["a.jpg", "b.png"]), Some(Category::Image));

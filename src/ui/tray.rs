@@ -30,12 +30,12 @@ pub struct Tray {
 impl Tray {
     pub fn new(trigger_label: &str) -> anyhow::Result<Self> {
         let menu = Menu::new();
-        let show = MenuItem::new("Show DAct", true, None);
-        let enabled = CheckMenuItem::new("Enabled", true, true, None);
-        let open = MenuItem::new("Open a file…", true, None);
-        let settings = MenuItem::new("Settings…", true, None);
-        let welcome = MenuItem::new("How to use", true, None);
-        let quit = MenuItem::new("Quit DAct", true, None);
+        let show = MenuItem::new(crate::i18n::tray_show(), true, None);
+        let enabled = CheckMenuItem::new(crate::i18n::tray_enabled(), true, true, None);
+        let open = MenuItem::new(crate::i18n::tray_open(), true, None);
+        let settings = MenuItem::new(crate::i18n::tray_settings(), true, None);
+        let welcome = MenuItem::new(crate::i18n::how_to_use(), true, None);
+        let quit = MenuItem::new(crate::i18n::quit_app(), true, None);
         menu.append_items(&[
             &show,
             &enabled,
@@ -142,5 +142,5 @@ impl Tray {
 }
 
 fn idle_tip(trigger_label: &str) -> String {
-    format!("DAct — {trigger_label} + left click on a file")
+    crate::i18n::tray_tip(trigger_label)
 }

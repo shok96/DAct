@@ -102,7 +102,7 @@ impl Ffmpeg {
                 return Err(DactError::NoAudio);
             }
             if low.contains("no space left") {
-                return Err(DactError::user("Not enough free disk space."));
+                return Err(DactError::user(crate::i18n::err_disk_full()));
             }
             return Err(DactError::FfmpegFailed);
         }
@@ -219,7 +219,7 @@ pub fn install() -> Result<PathBuf> {
     extracted?;
     if !dest.is_file() {
         return Err(DactError::user(
-            "Downloaded FFmpeg, but the ffmpeg binary was not in the archive.",
+            crate::i18n::err_ffmpeg_missing_bin(),
         ));
     }
     mark_tool(&dest)?;
@@ -241,9 +241,7 @@ fn ffmpeg_archive_url() -> Result<String> {
             "x86_64" => "x64",
             "aarch64" => "arm64",
             other => {
-                return Err(DactError::user(format!(
-                    "No FFmpeg build for this Mac ({other}). Install ffmpeg yourself and set the path in Settings."
-                )));
+                return Err(DactError::user(crate::i18n::err_ffmpeg_no_mac(other)));
             }
         };
         Ok(format!(
@@ -258,9 +256,7 @@ fn ffmpeg_archive_url() -> Result<String> {
             "x86_64" => "ffmpeg-n9.0-latest-linux64-gpl-9.0.tar.xz",
             "aarch64" => "ffmpeg-n9.0-latest-linuxarm64-gpl-9.0.tar.xz",
             other => {
-                return Err(DactError::user(format!(
-                    "No FFmpeg build for this Linux ({other}). Install ffmpeg yourself and set the path in Settings."
-                )));
+                return Err(DactError::user(crate::i18n::err_ffmpeg_no_linux(other)));
             }
         };
         Ok(format!(
@@ -271,7 +267,7 @@ fn ffmpeg_archive_url() -> Result<String> {
     {
         let _ = ();
         Err(DactError::user(
-            "No FFmpeg download for this system. Install ffmpeg yourself and set the path in Settings.",
+            crate::i18n::err_ffmpeg_no_os(),
         ))
     }
 }
@@ -293,7 +289,7 @@ fn download(url: &str, dest: &Path) -> Result<()> {
         .get(url)
         .set("User-Agent", "DAct")
         .call()
-        .map_err(|e| DactError::user(format!("Could not download FFmpeg: {e}")))?;
+        .map_err(|e| DactError::user(crate::i18n::err_ffmpeg_download(e)))?;
     let mut file = File::create(dest).map_err(DactError::from_io)?;
     let mut reader = resp.into_reader();
     std::io::copy(&mut reader, &mut file).map_err(DactError::from_io)?;
@@ -312,13 +308,13 @@ fn tool_file_name(entry_name: &str) -> Option<String> {
 fn extract_tools(zip_path: &Path, dest_dir: &Path) -> Result<()> {
     let file = File::open(zip_path).map_err(DactError::from_io)?;
     let mut archive = zip::ZipArchive::new(file)
-        .map_err(|e| DactError::user(format!("Could not open FFmpeg archive: {e}")))?;
+        .map_err(|e| DactError::user(crate::i18n::err_ffmpeg_archive(e)))?;
     let mut staged: Vec<(PathBuf, PathBuf)> = Vec::new();
     let mut found = false;
     for i in 0..archive.len() {
         let mut entry = archive
             .by_index(i)
-            .map_err(|e| DactError::user(format!("Could not read FFmpeg archive: {e}")))?;
+            .map_err(|e| DactError::user(crate::i18n::err_ffmpeg_archive_read(e)))?;
         if !entry.is_file() {
             continue;
         }
@@ -349,7 +345,7 @@ fn extract_tools(zip_path: &Path, dest_dir: &Path) -> Result<()> {
             let _ = fs::remove_file(part);
         }
         return Err(DactError::user(
-            "The FFmpeg archive did not contain the ffmpeg binary.",
+            crate::i18n::err_ffmpeg_no_bin(),
         ));
     }
     for (part, final_path) in staged {
@@ -365,19 +361,19 @@ fn extract_tar_xz(archive_path: &Path, dest_dir: &Path) -> Result<()> {
     let mut archive = tar::Archive::new(decoder);
     let entries = archive
         .entries()
-        .map_err(|e| DactError::user(format!("Could not read FFmpeg archive: {e}")))?;
+        .map_err(|e| DactError::user(crate::i18n::err_ffmpeg_archive_read(e)))?;
     let mut staged: Vec<(PathBuf, PathBuf)> = Vec::new();
     let mut found = false;
     for entry in entries {
         let mut entry =
-            entry.map_err(|e| DactError::user(format!("Could not read FFmpeg archive: {e}")))?;
+            entry.map_err(|e| DactError::user(crate::i18n::err_ffmpeg_archive_read(e)))?;
         if !entry.header().entry_type().is_file() {
             continue;
         }
         let file_name = {
             let path = entry
                 .path()
-                .map_err(|e| DactError::user(format!("Could not read FFmpeg archive: {e}")))?;
+                .map_err(|e| DactError::user(crate::i18n::err_ffmpeg_archive_read(e)))?;
             path.file_name()
                 .and_then(|s| s.to_str())
                 .map(|s| s.to_string())
@@ -412,7 +408,7 @@ fn extract_tar_xz(archive_path: &Path, dest_dir: &Path) -> Result<()> {
             let _ = fs::remove_file(part);
         }
         return Err(DactError::user(
-            "The FFmpeg archive did not contain the ffmpeg binary.",
+            crate::i18n::err_ffmpeg_no_bin(),
         ));
     }
     for (part, final_path) in staged {
@@ -424,7 +420,7 @@ fn extract_tar_xz(archive_path: &Path, dest_dir: &Path) -> Result<()> {
 #[cfg(not(target_os = "linux"))]
 fn extract_tar_xz(_archive_path: &Path, _dest_dir: &Path) -> Result<()> {
     Err(DactError::user(
-        "This FFmpeg archive is only unpacked on Linux.",
+        crate::i18n::err_ffmpeg_linux_only(),
     ))
 }
 

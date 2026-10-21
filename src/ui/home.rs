@@ -72,16 +72,16 @@ fn top_bar(ui: &mut Ui, settings: &Settings, ffmpeg: Option<&Ffmpeg>) -> Option<
                     .strong(),
             );
             ui.label(
-                RichText::new("Convert beside the original. Close this window — DAct stays in the tray.")
+                RichText::new(crate::i18n::home_tagline())
                     .size(12.0)
                     .color(theme::TEXT_DIM),
             );
         });
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if chip(ui, "How to use").clicked() {
+            if chip(ui, crate::i18n::how_to_use()).clicked() {
                 event = Some(HomeEvent::Welcome);
             }
-            if chip(ui, "Settings").clicked() {
+            if chip(ui, crate::i18n::settings_title()).clicked() {
                 event = Some(HomeEvent::Settings);
             }
             let (label, color) = if let Some(ff) = ffmpeg {
@@ -91,20 +91,20 @@ fn top_bar(ui: &mut Ui, settings: &Settings, ffmpeg: Option<&Ffmpeg>) -> Option<
                         ff.exe
                             .file_name()
                             .map(|s| s.to_string_lossy().into_owned())
-                            .unwrap_or_else(|| "ready".into())
+                            .unwrap_or_else(|| crate::i18n::ffmpeg_ready_chip().into())
                     ),
                     theme::GOOD,
                 )
             } else {
-                ("FFmpeg  missing".into(), theme::BAD)
+                (format!("FFmpeg  {}", crate::i18n::ffmpeg_missing_chip()), theme::BAD)
             };
             ui.label(RichText::new(label).size(12.0).color(color));
-            if ffmpeg.is_none() && chip(ui, "Get FFmpeg").clicked() {
+            if ffmpeg.is_none() && chip(ui, crate::i18n::get_ffmpeg()).clicked() {
                 event = Some(HomeEvent::InstallFfmpeg);
             }
             ui.add_space(8.0);
             ui.label(
-                RichText::new(format!("{} + click", settings.trigger.label()))
+                RichText::new(crate::i18n::chord(settings.trigger.label()))
                     .size(12.0)
                     .color(theme::COPPER_HOT),
             );
@@ -141,24 +141,24 @@ fn drop_column(
             ui.set_min_height(420.0);
             ui.label(
                 RichText::new(if files.is_empty() {
-                    "Drop files here"
+                    crate::i18n::drop_files_here()
                 } else {
-                    "Queue"
+                    crate::i18n::queue()
                 })
                 .size(16.0)
                 .color(theme::TEXT),
             );
             ui.label(
-                RichText::new("Images, PDF, text, audio, video.")
+                RichText::new(crate::i18n::drop_kinds())
                     .size(12.0)
                     .color(theme::TEXT_DIM),
             );
             ui.add_space(10.0);
             ui.horizontal(|ui| {
-                if copper_button(ui, "Open files").clicked() {
+                if copper_button(ui, crate::i18n::open_files()).clicked() {
                     event = Some(HomeEvent::OpenFiles);
                 }
-                if !files.is_empty() && quiet_button(ui, "Clear").clicked() {
+                if !files.is_empty() && quiet_button(ui, crate::i18n::clear()).clicked() {
                     event = Some(HomeEvent::Clear);
                 }
             });
@@ -166,22 +166,22 @@ fn drop_column(
             if files.is_empty() {
                 ui.add_space(48.0);
                 ui.label(
-                    RichText::new("PNG JPG WEBP TIFF BMP GIF ICO")
+                    RichText::new(crate::i18n::empty_formats_images())
                         .size(11.0)
                         .color(theme::TEXT_DIM),
                 );
                 ui.label(
-                    RichText::new("HEIC AVIF  ·  needs FFmpeg")
+                    RichText::new(crate::i18n::empty_formats_heic())
                         .size(11.0)
                         .color(theme::TEXT_DIM),
                 );
                 ui.label(
-                    RichText::new("MP3 WAV FLAC MP4 MKV  ·  needs FFmpeg")
+                    RichText::new(crate::i18n::empty_formats_media())
                         .size(11.0)
                         .color(theme::TEXT_DIM),
                 );
                 ui.label(
-                    RichText::new("PDF TXT MD DOCX")
+                    RichText::new(crate::i18n::empty_formats_docs())
                         .size(11.0)
                         .color(theme::TEXT_DIM),
                 );
@@ -238,9 +238,9 @@ fn action_column(
             ui.set_min_height(420.0);
             ui.set_min_width(360.0);
             if files.is_empty() {
-                ui.label(RichText::new("No file selected").size(16.0).color(theme::TEXT));
+                ui.label(RichText::new(crate::i18n::no_file()).size(16.0).color(theme::TEXT));
                 ui.label(
-                    RichText::new("Open or drop something. Results go to system notifications. The dial still opens from the tray hotkey.")
+                    RichText::new(crate::i18n::no_file_help())
                         .size(12.0)
                         .color(theme::TEXT_DIM),
                 );
@@ -248,14 +248,12 @@ fn action_column(
             }
             if crate::category::uniform(files).is_none() {
                 ui.label(
-                    RichText::new("Select one file type")
+                    RichText::new(crate::i18n::select_one_type())
                         .size(16.0)
                         .color(theme::TEXT),
                 );
                 ui.label(
-                    RichText::new(
-                        "Batch convert works when every file is the same kind — all images, or all video, or all audio.",
-                    )
+                    RichText::new(crate::i18n::select_one_type_help())
                     .size(12.0)
                     .color(theme::BAD),
                 );
@@ -263,7 +261,7 @@ fn action_column(
             }
             if files.len() > 1 {
                 ui.label(
-                    RichText::new(format!("{} files · same type", files.len()))
+                    RichText::new(crate::i18n::same_type_n(files.len()))
                         .size(12.0)
                         .color(theme::COPPER),
                 );
@@ -277,14 +275,12 @@ fn action_column(
             }
             if matches!(cat, Some(Category::Audio | Category::Video)) && !has_ffmpeg {
                 ui.label(
-                    RichText::new(
-                        "Audio and video need FFmpeg in this user folder. Press Get FFmpeg, or pick a binary in Settings.",
-                    )
+                    RichText::new(crate::i18n::need_ffmpeg())
                     .color(theme::BAD)
                     .size(13.0),
                 );
                 ui.add_space(6.0);
-                if copper_button(ui, "Get FFmpeg").clicked() {
+                if copper_button(ui, crate::i18n::get_ffmpeg()).clicked() {
                     event = Some(HomeEvent::InstallFfmpeg);
                 }
                 ui.add_space(8.0);
@@ -296,7 +292,7 @@ fn action_column(
                         && !has_ffmpeg
                     {
                         ui.label(
-                            RichText::new("HEIC / AVIF decode uses local FFmpeg if the built-in reader cannot open the file.")
+                            RichText::new(crate::i18n::heic_ffmpeg())
                                 .color(theme::TEXT_DIM)
                                 .size(12.0),
                         );
@@ -335,14 +331,7 @@ fn action_column(
 }
 
 fn category_label(cat: Category) -> &'static str {
-    match cat {
-        Category::Image => "Image",
-        Category::Pdf => "PDF",
-        Category::Docx => "Word",
-        Category::Text => "Text",
-        Category::Audio => "Audio",
-        Category::Video => "Video",
-    }
+    crate::i18n::category_label(cat)
 }
 
 fn chip(ui: &mut Ui, text: &str) -> egui::Response {
@@ -363,7 +352,7 @@ fn copper_button(ui: &mut Ui, text: &str) -> egui::Response {
         egui::Button::new(RichText::new(text).size(13.0).color(theme::INK).strong())
             .fill(theme::COPPER)
             .corner_radius(8.0)
-            .min_size(Vec2::new(108.0, 32.0)),
+            .min_size(Vec2::new(128.0, 32.0)),
     )
 }
 

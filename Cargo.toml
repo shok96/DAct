@@ -2,7 +2,7 @@
 name = "dact"
 version = "0.1.0"
 edition = "2021"
-description = "Convert files with a radial menu: hold Alt, press the left mouse button, release on a slice. Windows, macOS and Linux."
+description = "Конвертация файлов кольцевым меню: удерживайте Alt / Option, нажмите кнопку мыши, отпустите на секторе. Windows, macOS и Linux."
 license = "MIT"
 authors = ["Roma Kosyachenko"]
 repository = "https://github.com/shok96/DAct"

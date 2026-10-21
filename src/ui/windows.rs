@@ -15,16 +15,16 @@ impl SettingsWin {
         }
         let mut changed = false;
         let mut open = self.open;
-        egui::Window::new("Settings")
+        egui::Window::new(crate::i18n::settings_title())
             .open(&mut open)
             .resizable(false)
             .collapsible(false)
             .default_width(420.0)
             .show(ctx, |ui| {
                 ui.add_space(4.0);
-                ui.label(RichText::new("Hotkey").color(theme::TEXT_DIM).size(12.0));
+                ui.label(RichText::new(crate::i18n::settings_hotkey()).color(theme::TEXT_DIM).size(12.0));
                 ui.label(
-                    RichText::new("Hold this key and press the left mouse button. Change it any time.")
+                    RichText::new(crate::i18n::settings_hotkey_help(settings.trigger.label()))
                         .color(theme::TEXT_DIM)
                         .size(11.0),
                 );
@@ -50,21 +50,21 @@ impl SettingsWin {
                     }
                 });
                 ui.add_space(8.0);
-                ui.label(RichText::new("Save results").color(theme::TEXT_DIM).size(12.0));
+                ui.label(RichText::new(crate::i18n::settings_save()).color(theme::TEXT_DIM).size(12.0));
                 if ui
-                    .radio_value(&mut settings.output, OutputMode::NextToOriginal, "Next to the original")
+                    .radio_value(&mut settings.output, OutputMode::NextToOriginal, crate::i18n::settings_next_to())
                     .changed()
                 {
                     changed = true;
                 }
                 if ui
-                    .radio_value(&mut settings.output, OutputMode::Subfolder, "In a DAct subfolder")
+                    .radio_value(&mut settings.output, OutputMode::Subfolder, crate::i18n::settings_subfolder())
                     .changed()
                 {
                     changed = true;
                 }
                 ui.add_space(8.0);
-                ui.label(RichText::new("JPEG quality").color(theme::TEXT_DIM).size(12.0));
+                ui.label(RichText::new(crate::i18n::settings_jpeg()).color(theme::TEXT_DIM).size(12.0));
                 if ui
                     .add(egui::Slider::new(&mut settings.jpg_quality, 40..=100).suffix("%"))
                     .changed()
@@ -72,13 +72,13 @@ impl SettingsWin {
                     changed = true;
                 }
                 ui.add_space(8.0);
-                ui.label(RichText::new("Audio quality").color(theme::TEXT_DIM).size(12.0));
+                ui.label(RichText::new(crate::i18n::settings_audio()).color(theme::TEXT_DIM).size(12.0));
                 ui.horizontal(|ui| {
                     for q in [AudioQuality::Low, AudioQuality::Medium, AudioQuality::High] {
                         let label = match q {
-                            AudioQuality::Low => "Low",
-                            AudioQuality::Medium => "Medium",
-                            AudioQuality::High => "High",
+                            AudioQuality::Low => crate::i18n::quality_low(),
+                            AudioQuality::Medium => crate::i18n::quality_medium(),
+                            AudioQuality::High => crate::i18n::quality_high(),
                         };
                         if ui.selectable_label(settings.audio_quality == q, label).clicked() {
                             settings.audio_quality = q;
@@ -87,9 +87,9 @@ impl SettingsWin {
                     }
                 });
                 ui.add_space(8.0);
-                ui.label(RichText::new("FFmpeg path (optional)").color(theme::TEXT_DIM).size(12.0));
+                ui.label(RichText::new(crate::i18n::settings_ffmpeg()).color(theme::TEXT_DIM).size(12.0));
                 ui.label(
-                    RichText::new("Local binary only. Get FFmpeg copies a static build into this user folder. Nothing is downloaded at launch.")
+                    RichText::new(crate::i18n::settings_ffmpeg_help())
                         .color(theme::TEXT_DIM)
                         .size(11.0),
                 );
@@ -97,8 +97,8 @@ impl SettingsWin {
                     if ui.text_edit_singleline(&mut settings.ffmpeg_path).changed() {
                         changed = true;
                     }
-                    if ui.button("Browse").clicked() {
-                        let mut dlg = rfd::FileDialog::new().set_title("FFmpeg executable");
+                    if ui.button(crate::i18n::browse()).clicked() {
+                        let mut dlg = rfd::FileDialog::new().set_title(crate::i18n::ffmpeg_exe_title());
                         #[cfg(windows)]
                         {
                             dlg = dlg.add_filter("FFmpeg", &["exe"]);
@@ -111,7 +111,7 @@ impl SettingsWin {
                 });
                 ui.add_space(8.0);
                 if ui
-                    .checkbox(&mut settings.autostart, "Start DAct when I sign in")
+                    .checkbox(&mut settings.autostart, crate::i18n::start_at_login())
                     .changed()
                 {
                     changed = true;
@@ -140,31 +140,31 @@ impl WelcomeWin {
             return;
         }
         let mut dismiss = false;
-        egui::Window::new("How to use DAct")
+        egui::Window::new(crate::i18n::welcome_title())
             .open(&mut self.open)
             .resizable(false)
             .collapsible(false)
             .default_width(440.0)
             .show(ctx, |ui| {
                 ui.label(
-                    RichText::new("A copper dial instead of a glass disc.")
+                    RichText::new(crate::i18n::welcome_lead())
                         .color(theme::COPPER)
                         .size(16.0),
                 );
                 ui.add_space(8.0);
-                ui.label("1. Select a file in Explorer, or start dragging it.");
-                ui.label(format!("2. Hold {trigger} and press the left mouse button. The dial opens under the cursor."));
-                ui.label("3. Keep the button down, move onto a slice, release. The original is never changed.");
-                ui.label(format!("4. Tap {trigger} again to flip Convert ↔ Tools."));
-                ui.label("5. Close or minimize this window — DAct stays in the tray. Quit only from the tray icon.");
+                ui.label(crate::i18n::welcome_step1());
+                ui.label(crate::i18n::welcome_step2(trigger));
+                ui.label(crate::i18n::welcome_step3());
+                ui.label(crate::i18n::welcome_step4(trigger));
+                ui.label(crate::i18n::welcome_step5());
                 ui.add_space(8.0);
                 ui.label(
-                    RichText::new("Progress and results appear as system notifications. DAct does not capture the desktop and does not phone home. FFmpeg is fetched only if you press Get FFmpeg.")
+                    RichText::new(crate::i18n::welcome_privacy())
                         .color(theme::TEXT_DIM)
                         .size(12.0),
                 );
                 ui.add_space(10.0);
-                if ui.button("Got it").clicked() {
+                if ui.button(crate::i18n::got_it()).clicked() {
                     settings.welcomed = true;
                     let _ = settings.save();
                     dismiss = true;
@@ -196,14 +196,14 @@ impl CompressWin {
             return None;
         }
         let mut apply = None;
-        egui::Window::new("Compress")
+        egui::Window::new(crate::i18n::compress_title())
             .open(&mut self.open)
             .resizable(false)
             .collapsible(false)
             .show(ctx, |ui| {
-                ui.label("Quality for the new copy. The original stays put.");
-                ui.add(egui::Slider::new(&mut self.quality, 30..=95).text("quality"));
-                if ui.button("Compress").clicked() {
+                ui.label(crate::i18n::compress_help());
+                ui.add(egui::Slider::new(&mut self.quality, 30..=95).text(crate::i18n::compress_slider()));
+                if ui.button(crate::i18n::tool_compress()).clicked() {
                     apply = Some(self.quality);
                 }
             });
@@ -236,25 +236,25 @@ impl ResizeWin {
             return None;
         }
         let mut apply = None;
-        egui::Window::new("Resize")
+        egui::Window::new(crate::i18n::resize_title())
             .open(&mut self.open)
             .resizable(false)
             .collapsible(false)
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     for (id, label) in [
-                        ("pct", "Percent"),
-                        ("long", "Long side"),
-                        ("w", "Width"),
-                        ("h", "Height"),
+                        ("pct", crate::i18n::resize_pct()),
+                        ("long", crate::i18n::resize_long()),
+                        ("w", crate::i18n::resize_w()),
+                        ("h", crate::i18n::resize_h()),
                     ] {
                         if ui.selectable_label(self.mode == id, label).clicked() {
                             self.mode = id.into();
                         }
                     }
                 });
-                ui.add(egui::Slider::new(&mut self.value, 16..=8000).text("value"));
-                if ui.button("Resize").clicked() {
+                ui.add(egui::Slider::new(&mut self.value, 16..=8000).text(crate::i18n::resize_value()));
+                if ui.button(crate::i18n::tool_resize()).clicked() {
                     apply = Some((self.mode.clone(), self.value));
                 }
             });

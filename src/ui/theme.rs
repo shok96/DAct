@@ -1,4 +1,6 @@
-use eframe::egui::{self, Color32, FontFamily, FontId, Stroke};
+use std::sync::Arc;
+
+use eframe::egui::{self, Color32, FontData, FontDefinitions, FontFamily, FontId, Stroke};
 
 /// Copper on dark. Overlay HWNDs are clipped; unpainted pixels stay clear.
 pub const INK: Color32 = Color32::from_rgb(11, 12, 16);
@@ -14,6 +16,7 @@ pub const BAD: Color32 = Color32::from_rgb(224, 122, 106);
 pub const HUB: Color32 = Color32::from_rgb(16, 17, 22);
 
 pub fn apply(ctx: &egui::Context) {
+    install_cyrillic_font(ctx);
     let mut style = (*ctx.style()).clone();
     style.visuals.dark_mode = true;
     style.visuals.window_fill = PANEL;
@@ -37,4 +40,56 @@ pub fn apply(ctx: &egui::Context) {
 
 pub fn label_font(size: f32) -> FontId {
     FontId::new(size, FontFamily::Proportional)
+}
+
+fn install_cyrillic_font(ctx: &egui::Context) {
+    let Some(bytes) = load_ui_font() else {
+        return;
+    };
+    let mut fonts = FontDefinitions::default();
+    fonts.font_data.insert(
+        "ui-cyr".into(),
+        Arc::new(FontData::from_owned(bytes)),
+    );
+    fonts
+        .families
+        .entry(FontFamily::Proportional)
+        .or_default()
+        .insert(0, "ui-cyr".into());
+    fonts
+        .families
+        .entry(FontFamily::Monospace)
+        .or_default()
+        .push("ui-cyr".into());
+    ctx.set_fonts(fonts);
+}
+
+fn load_ui_font() -> Option<Vec<u8>> {
+    #[cfg(windows)]
+    const CANDIDATES: &[&str] = &[
+        r"C:\Windows\Fonts\segoeui.ttf",
+        r"C:\Windows\Fonts\tahoma.ttf",
+        r"C:\Windows\Fonts\arial.ttf",
+    ];
+    #[cfg(target_os = "macos")]
+    const CANDIDATES: &[&str] = &[
+        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+        "/Library/Fonts/Arial Unicode.ttf",
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/System/Library/Fonts/Supplemental/Times New Roman.ttf",
+        "/System/Library/Fonts/Geneva.ttf",
+    ];
+    #[cfg(not(any(windows, target_os = "macos")))]
+    const CANDIDATES: &[&str] = &[
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans.ttf",
+    ];
+    for path in CANDIDATES {
+        if let Ok(bytes) = std::fs::read(path) {
+            return Some(bytes);
+        }
+    }
+    None
 }

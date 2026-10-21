@@ -276,17 +276,17 @@ fn draw_toast(ui: &mut egui::Ui, toast: &mut Toast, idx: usize) {
         if let Some(outs) = outs {
             ui.add_space(4.0);
             ui.horizontal(|ui| {
-                if pill(ui, "Open").clicked() {
+                if pill(ui, crate::i18n::open()).clicked() {
                     if let Some(p) = outs.first() {
                         reveal::open_file(p);
                     }
                 }
-                if pill(ui, "Show in folder").clicked() {
+                if pill(ui, crate::i18n::show_in_folder()).clicked() {
                     if let Some(p) = outs.first() {
                         reveal::reveal(p);
                     }
                 }
-                if pill(ui, "Undo").clicked() {
+                if pill(ui, crate::i18n::undo()).clicked() {
                     reveal::trash_paths(&outs);
                     toast.closing = true;
                 }

@@ -23,7 +23,7 @@ pub fn image_bytes_to_pdf(rgb: &RgbImage) -> Result<Vec<u8>> {
 
 pub fn images_to_pdf(pages: &[RgbImage]) -> Result<Vec<u8>> {
     if pages.is_empty() {
-        return Err(DactError::user("No pages to write."));
+        return Err(DactError::user(crate::i18n::err_no_pages()));
     }
     let mut pdf = Vec::new();
     let mut xref: Vec<u64> = vec![0];
@@ -278,7 +278,7 @@ fn assemble_pdf(objects: &[Vec<u8>]) -> Result<Vec<u8>> {
 
 pub fn pdf_to_txt(src: &Path, settings: &Settings) -> Result<PathBuf> {
     let text = pdf_extract::extract_text(src)
-        .map_err(|e| DactError::user(format!("Could not read this PDF: {e}")))?;
+        .map_err(|e| DactError::user(crate::i18n::err_pdf_read(e)))?;
     let out = sibling(src, "", "txt", settings.output)?;
     atomic_write(&out, text.as_bytes())?;
     Ok(out)
@@ -286,7 +286,7 @@ pub fn pdf_to_txt(src: &Path, settings: &Settings) -> Result<PathBuf> {
 
 pub fn merge_pdfs(srcs: &[PathBuf], settings: &Settings) -> Result<PathBuf> {
     if srcs.len() < 2 {
-        return Err(DactError::user("Drop at least two PDFs to merge."));
+        return Err(DactError::user(crate::i18n::err_merge_two()));
     }
     let mut max_id = 1u32;
     let mut page_ids: Vec<ObjectId> = Vec::new();
@@ -335,7 +335,7 @@ pub fn merge_pdfs(srcs: &[PathBuf], settings: &Settings) -> Result<PathBuf> {
     );
     merged.trailer.set("Root", Object::Reference(catalog_id));
 
-    let out = sibling(&srcs[0], "Merged", "pdf", settings.output)?;
+    let out = sibling(&srcs[0], crate::i18n::suffix_merged(), "pdf", settings.output)?;
     save_lopdf(&mut merged, &out)?;
     Ok(out)
 }
@@ -347,7 +347,7 @@ pub fn split_pdf(src: &Path, settings: &Settings) -> Result<Vec<PathBuf>> {
     }
     let pages = doc.get_pages();
     if pages.is_empty() {
-        return Err(DactError::user("This PDF has no pages."));
+        return Err(DactError::user(crate::i18n::err_pdf_empty()));
     }
     let mut outs = Vec::new();
     for (i, (_, page_id)) in pages.iter().enumerate() {
@@ -356,7 +356,7 @@ pub fn split_pdf(src: &Path, settings: &Settings) -> Result<Vec<PathBuf>> {
         let label = if pages.len() == 1 {
             String::new()
         } else {
-            format!("page {}", i + 1)
+            crate::i18n::suffix_page(i + 1)
         };
         let out = sibling(src, &label, "pdf", settings.output)?;
         save_lopdf(&mut one, &out)?;
@@ -381,7 +381,7 @@ pub fn rotate_pdf(src: &Path, settings: &Settings) -> Result<PathBuf> {
             dict.set("Rotate", Object::Integer((current + 90) % 360));
         }
     }
-    let out = sibling(src, "Rotated", "pdf", settings.output)?;
+    let out = sibling(src, crate::i18n::suffix_rotated(), "pdf", settings.output)?;
     save_lopdf(&mut doc, &out)?;
     Ok(out)
 }
@@ -392,7 +392,7 @@ pub fn compress_pdf(src: &Path, settings: &Settings) -> Result<PathBuf> {
         return Err(DactError::PdfLocked);
     }
     doc.compress();
-    let out = sibling(src, "Compressed", "pdf", settings.output)?;
+    let out = sibling(src, crate::i18n::suffix_compressed(), "pdf", settings.output)?;
     save_lopdf(&mut doc, &out)?;
     Ok(out)
 }
@@ -413,15 +413,13 @@ pub fn extract_pdf_images(src: &Path, settings: &Settings) -> Result<Vec<PathBuf
         }
         n += 1;
         if let Some((bytes, ext)) = decode_image_stream(stream) {
-            let out = sibling(src, &format!("image {n}"), &ext, settings.output)?;
+            let out = sibling(src, &crate::i18n::suffix_frame(n), &ext, settings.output)?;
             atomic_write(&out, &bytes)?;
             outs.push(out);
         }
     }
     if outs.is_empty() {
-        return Err(DactError::user(
-            "No embedded images were found in this PDF.",
-        ));
+        return Err(DactError::user(crate::i18n::err_no_embedded()));
     }
     Ok(outs)
 }
@@ -506,7 +504,7 @@ fn collect_refs(
     }
     let obj = doc
         .get_object(id)
-        .map_err(|_| DactError::user("Could not read a PDF page."))?
+        .map_err(|_| DactError::user(crate::i18n::err_pdf_page()))?
         .clone();
     let refs = object_refs(&obj);
     out.insert(id, obj);
@@ -600,6 +598,6 @@ fn pdf_err(err: lopdf::Error) -> DactError {
     {
         DactError::PdfLocked
     } else {
-        DactError::user(format!("Could not read this PDF: {msg}"))
+        DactError::user(crate::i18n::err_pdf_read(msg))
     }
 }

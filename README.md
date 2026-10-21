@@ -11,6 +11,24 @@ Convert files with a radial menu on Windows, macOS and Linux. Hold Alt, press th
 
 The trigger key is Alt, Shift, or Ctrl. The default is Alt.
 
+## Examples
+
+Main window: drop or open files, then convert from the list or from the dial.
+
+![DAct main window](docs/ex-window.png)
+
+Hold the trigger and the left mouse button. The dial opens under the cursor. Video targets:
+
+![Video conversion dial](docs/ex-video.png)
+
+Image targets:
+
+![Image conversion dial](docs/ex-image.png)
+
+Progress and the result appear as a notice. **Open**, **Show in folder**, and **Undo** are on the card.
+
+![Conversion result notice](docs/ex-toast.png)
+
 Closing the window does not exit the process. The tray menu item **Quit DAct** does. A second launch while one instance is running forwards its file list to the running process instead of opening another window.
 
 One operation accepts files of a single category. A mix, such as a JPEG and an MP4, is rejected.
@@ -68,13 +86,42 @@ dact --version
 
 Rust 1.85 or newer, and a C compiler. `ring` (used by the HTTPS client that downloads FFmpeg on Windows) compiles C code. `Cargo.lock` is part of the repository.
 
+FFmpeg is not required to compile or to convert images, PDF, and text.
+
+### Quick build
+
+Scripts in `scripts/` compile a release binary and copy it to `dist/`.
+
+| System | Command | Output |
+|---|---|---|
+| Windows (PowerShell) | `.\scripts\build.ps1` | `dist\dact.exe` |
+| Windows (cmd) | `scripts\build.bat` | `dist\dact.exe` |
+| macOS | `./scripts/build.sh` | `dist/dact` |
+| Linux | `./scripts/build.sh` | `dist/dact` |
+
+On macOS and Linux, make the script executable once: `chmod +x scripts/build.sh`.
+
+Optional flags (same idea on every script):
+
+```
+# Windows
+.\scripts\build.ps1 -Test
+.\scripts\build.ps1 -Run
+
+# macOS / Linux
+./scripts/build.sh --test
+./scripts/build.sh --run
+```
+
+`-Test` / `--test` runs `cargo test` before the release build. `-Run` / `--run` starts the app from `dist/` after a successful build.
+
+The same result without a script:
+
 ```
 cargo build --release
 ```
 
-The binary is `target/release/dact` (`target\release\dact.exe` on Windows).
-
-FFmpeg is not required to compile or to convert images, PDF, and text.
+The cargo binary is `target/release/dact` (`target\release\dact.exe` on Windows). The scripts also leave a copy in `dist/` so you do not have to dig through `target/`.
 
 ### Windows
 
@@ -83,7 +130,7 @@ Use the MSVC toolchain, `x86_64-pc-windows-msvc`. Install [Visual Studio Build T
 ```
 rustup toolchain install stable
 rustup default stable
-cargo build --release
+.\scripts\build.ps1
 ```
 
 ### macOS
@@ -93,19 +140,24 @@ Xcode Command Line Tools supply `clang` and the system frameworks (`AppKit`, use
 ```
 xcode-select --install
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-cargo build --release
+chmod +x scripts/build.sh
+./scripts/build.sh
 ```
 
 Audio and video need FFmpeg. **Get FFmpeg** downloads it into the user data folder. A copy already on `PATH`, or a path set in **Settings**, is used instead.
 
+The first launch may ask for Accessibility so Option / Control can open the dial without Finder’s context menu. Grant it in **System Settings → Privacy & Security → Accessibility**.
+
 ### Linux
 
-The tray icon links GTK 3, libappindicator (Ayatana or the older libappindicator), and libxdo. Install those before `cargo build`.
+The tray icon links GTK 3, libappindicator (Ayatana or the older libappindicator), and libxdo. Install those before the build script.
 
 Debian and Ubuntu:
 
 ```
 sudo apt install build-essential pkg-config libgtk-3-dev libxdo-dev libayatana-appindicator3-dev
+chmod +x scripts/build.sh
+./scripts/build.sh
 ```
 
 If `libayatana-appindicator3-dev` is not in the archive, use `libappindicator3-dev` instead.
@@ -114,12 +166,14 @@ Fedora:
 
 ```
 sudo dnf install gcc pkgconf-pkg-config gtk3-devel libxdo-devel libayatana-appindicator-gtk3-devel
+./scripts/build.sh
 ```
 
 Arch Linux:
 
 ```
 sudo pacman -S --needed base-devel pkgconf gtk3 xdotool libayatana-appindicator
+./scripts/build.sh
 ```
 
 `libappindicator-gtk3` is the alternative to `libayatana-appindicator` when the Ayatana package is absent.
@@ -132,6 +186,8 @@ At run time the process loads OpenGL, X11 or Wayland, and the indicator library.
 cargo test
 cargo run --release -- --selftest
 ```
+
+Or through the scripts: `.\scripts\build.ps1 -Test` / `./scripts/build.sh --test`.
 
 `cargo test` covers extension classification and output-name uniqueness. `--selftest` covers the image and text conversions listed above.
 

@@ -63,7 +63,7 @@ fn main() {
     }
 
     if let Err(e) = dact::ui::app::run_ui(files, quiet) {
-        eprintln!("DAct failed to start: {e}");
+        eprintln!("{}", dact::i18n::start_failed(e));
         std::process::exit(1);
     }
 }
@@ -83,12 +83,13 @@ fn cli_convert(args: &[String]) -> anyhow::Result<()> {
         }
         i += 1;
     }
-    let target = target.ok_or_else(|| anyhow::anyhow!("usage: dact convert <file> --to JPG"))?;
+    let target = target.ok_or_else(|| anyhow::anyhow!("{}", dact::i18n::cli_usage()))?;
     if files.is_empty() {
-        anyhow::bail!("no input files");
+        anyhow::bail!("{}", dact::i18n::cli_no_files());
     }
     let settings = Settings::load();
-    let cat = dact::category::category(&files[0]).ok_or_else(|| anyhow::anyhow!("unsupported file"))?;
+    let cat = dact::category::category(&files[0])
+        .ok_or_else(|| anyhow::anyhow!("{}", dact::i18n::cli_unsupported()))?;
     let key = match cat {
         dact::category::Category::Audio | dact::category::Category::Video => format!("media:{target}"),
         _ => format!("convert:{target}"),
@@ -140,22 +141,8 @@ fn selftest() -> anyhow::Result<()> {
 }
 
 fn print_help() {
-    println!(
-        "{APP_NAME} {VERSION}
-Convert and edit files from a radial dial.
-
-Usage:
-  dact                     Run the tray app
-  dact <files...>          Open the dial for those files
-  dact convert <file> --to JPG
-  dact --selftest
-  dact --quiet             Start in the tray without opening the window
-
-Select a file, hold Alt, press the left mouse button, release on a slice.
-Close the window — DAct stays in the tray. Quit from the tray icon.
-The original is never changed.
-"
-    );
+    let trigger = dact::settings::TriggerKey::Alt.label();
+    print!("{}", dact::i18n::cli_help(APP_NAME, VERSION, trigger));
 }
 
 fn hide_console_if_tray(args: &[String]) {

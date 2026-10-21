@@ -3,6 +3,7 @@ pub mod category;
 pub mod convert;
 pub mod error;
 pub mod ffmpeg;
+pub mod i18n;
 pub mod ipc;
 pub mod notify;
 pub mod paths;

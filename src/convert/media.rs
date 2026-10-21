@@ -17,14 +17,44 @@ const AUDIO_FORMATS: &[(&str, &str, &str, &str)] = &[
     ("OPUS", "opus", "libopus", "opus"),
 ];
 
-const VIDEO_FORMATS: &[(&str, &str, &str)] = &[
-    ("MP4", "mp4", "mp4"),
-    ("MOV", "mov", "mov"),
-    ("MKV", "mkv", "matroska"),
-    ("WEBM", "webm", "webm"),
-    ("AVI", "avi", "avi"),
-    ("M4V", "m4v", "ipod"),
+#[derive(Clone, Copy)]
+struct VideoFmt {
+    name: &'static str,
+    ext: &'static str,
+    muxer: &'static str,
+    codec_variant: bool,
+}
+
+const VIDEO_CORE: &[VideoFmt] = &[
+    VideoFmt { name: "MP4", ext: "mp4", muxer: "mp4", codec_variant: false },
+    VideoFmt { name: "MOV", ext: "mov", muxer: "mov", codec_variant: false },
+    VideoFmt { name: "MKV", ext: "mkv", muxer: "matroska", codec_variant: false },
+    VideoFmt { name: "WEBM", ext: "webm", muxer: "webm", codec_variant: false },
+    VideoFmt { name: "AVI", ext: "avi", muxer: "avi", codec_variant: false },
+    VideoFmt { name: "M4V", ext: "m4v", muxer: "ipod", codec_variant: false },
 ];
+
+#[cfg(target_os = "macos")]
+const VIDEO_MAC: &[VideoFmt] = &[
+    VideoFmt { name: "HEVC", ext: "mp4", muxer: "mp4", codec_variant: true },
+    VideoFmt { name: "ProRes", ext: "mov", muxer: "mov", codec_variant: true },
+    VideoFmt { name: "GIF", ext: "gif", muxer: "gif", codec_variant: false },
+    VideoFmt { name: "MPEG", ext: "mpg", muxer: "mpeg", codec_variant: false },
+    VideoFmt { name: "TS", ext: "ts", muxer: "mpegts", codec_variant: false },
+];
+
+fn video_formats() -> Vec<VideoFmt> {
+    #[cfg(target_os = "macos")]
+    {
+        let mut out = VIDEO_CORE.to_vec();
+        out.extend_from_slice(VIDEO_MAC);
+        out
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        VIDEO_CORE.to_vec()
+    }
+}
 
 pub fn audio_targets(src: &Path) -> Vec<String> {
     let ext = src
@@ -45,10 +75,10 @@ pub fn video_targets(src: &Path) -> Vec<String> {
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_ascii_lowercase();
-    VIDEO_FORMATS
-        .iter()
-        .filter(|(_, e, _)| *e != ext)
-        .map(|(n, _, _)| (*n).to_string())
+    video_formats()
+        .into_iter()
+        .filter(|f| f.codec_variant || f.ext != ext)
+        .map(|f| f.name.to_string())
         .collect()
 }
 
@@ -67,7 +97,12 @@ pub fn convert_media(
     } else {
         video_args(&target)?
     };
-    let out = sibling(src, "", &ext, settings.output)?;
+    let label = match target.as_str() {
+        "HEVC" => crate::i18n::suffix_hevc(),
+        "ProRes" => crate::i18n::suffix_prores(),
+        _ => "",
+    };
+    let out = sibling(src, label, &ext, settings.output)?;
     let tmp = unique_path(out.with_file_name(format!(
         ".~{}.part.{}",
         out.file_stem().and_then(|s| s.to_str()).unwrap_or("out"),
@@ -92,7 +127,7 @@ fn audio_args(target: &str, settings: &Settings) -> Result<(String, Vec<String>)
     let (name, ext, encoder, muxer) = AUDIO_FORMATS
         .iter()
         .find(|(n, _, _, _)| *n == target)
-        .ok_or_else(|| DactError::user(format!("Unknown audio target {target}")))?;
+        .ok_or_else(|| DactError::user(crate::i18n::err_unknown_audio(target)))?;
     let _ = name;
     let mut args = vec![
         "-vn".into(),
@@ -136,47 +171,105 @@ fn audio_args(target: &str, settings: &Settings) -> Result<(String, Vec<String>)
 }
 
 fn video_args(target: &str) -> Result<(String, Vec<String>)> {
-    let (_, ext, muxer) = VIDEO_FORMATS
-        .iter()
-        .find(|(n, _, _)| *n == target)
-        .ok_or_else(|| DactError::user(format!("Unknown video target {target}")))?;
-    let (vcodec, extra) = if target == "WEBM" {
-        (
+    let fmt = video_formats()
+        .into_iter()
+        .find(|f| f.name == target)
+        .ok_or_else(|| DactError::user(crate::i18n::err_unknown_video(target)))?;
+    let mut args = match target {
+        "WEBM" => vec![
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a?",
+            "-c:v",
             "libvpx-vp9",
+            "-deadline",
+            "good",
+            "-cpu-used",
+            "2",
+            "-crf",
+            "31",
+            "-b:v",
+            "0",
+            "-c:a",
+            "libopus",
+        ],
+        "HEVC" => vec![
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a?",
+            "-c:v",
+            "hevc_videotoolbox",
+            "-q:v",
+            "45",
+            "-tag:v",
+            "hvc1",
+            "-c:a",
+            "aac",
+        ],
+        "ProRes" => vec![
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a?",
+            "-c:v",
+            "prores_ks",
+            "-profile:v",
+            "2",
+            "-c:a",
+            "pcm_s16le",
+        ],
+        "GIF" => vec![
+            "-map",
+            "0:v:0",
+            "-an",
+            "-vf",
+            "fps=12,scale=min(720\\,iw):-2:flags=lanczos",
+            "-c:v",
+            "gif",
+        ],
+        "MPEG" => vec![
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a?",
+            "-c:v",
+            "mpeg2video",
+            "-q:v",
+            "5",
+            "-c:a",
+            "mp2",
+            "-b:a",
+            "192k",
+        ],
+        other => {
+            let acodec = match other {
+                "AVI" => "libmp3lame",
+                "MKV" => "copy",
+                _ => "aac",
+            };
             vec![
-                "-deadline",
-                "good",
-                "-cpu-used",
-                "2",
+                "-map",
+                "0:v:0",
+                "-map",
+                "0:a?",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "medium",
                 "-crf",
-                "31",
-                "-b:v",
-                "0",
-            ],
-        )
-    } else {
-        ("libx264", vec!["-preset", "medium", "-crf", "21"])
+                "21",
+                "-c:a",
+                acodec,
+            ]
+        }
     };
-    let acodec = match target {
-        "WEBM" => "libopus",
-        "AVI" => "libmp3lame",
-        "MKV" => "copy",
-        _ => "aac",
-    };
-    let mut args = vec![
-        "-map".into(),
-        "0:v:0".into(),
-        "-map".into(),
-        "0:a?".into(),
-        "-c:v".into(),
-        vcodec.into(),
-    ];
-    args.extend(extra.into_iter().map(|s| s.to_string()));
-    args.push("-c:a".into());
-    args.push(acodec.into());
-    args.push("-f".into());
-    args.push((*muxer).into());
-    Ok(((*ext).into(), args))
+    args.extend(["-f", fmt.muxer]);
+    Ok((
+        fmt.ext.into(),
+        args.into_iter().map(str::to_string).collect(),
+    ))
 }
 
 fn bitrate(target: &str, quality: AudioQuality) -> u32 {
@@ -193,4 +286,23 @@ fn bitrate(target: &str, quality: AudioQuality) -> u32 {
 
 pub fn ffmpeg_available(settings: &Settings) -> bool {
     Ffmpeg::resolve(settings).is_ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn video_targets_skip_same_container() {
+        let t = video_targets(Path::new("clip.mp4"));
+        assert!(t.contains(&"MOV".into()));
+        assert!(!t.contains(&"MP4".into()));
+        #[cfg(target_os = "macos")]
+        {
+            assert!(t.contains(&"HEVC".into()));
+            assert!(t.contains(&"ProRes".into()));
+            assert!(t.contains(&"GIF".into()));
+        }
+    }
 }

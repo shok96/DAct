@@ -80,11 +80,8 @@ impl DactApp {
             welcome.open = true;
         } else if !quiet && initial_files.is_empty() {
             toasts.info(
-                "DAct is ready",
-                format!(
-                    "Drop a file here, or hold {} and press the left mouse button. Close the window — DAct stays in the tray.",
-                    settings.trigger.label()
-                ),
+                crate::i18n::ready_title(),
+                crate::i18n::ready_body(settings.trigger.label()),
             );
         }
         let mut app = Self {
@@ -153,9 +150,9 @@ impl DactApp {
                 .map(|s| s.to_string_lossy().into_owned())
                 .unwrap_or_default()
         } else {
-            format!("{} files", srcs.len())
+            crate::i18n::files_n(srcs.len())
         };
-        let title = working_label(&action);
+        let title = crate::i18n::working_label(&action);
         if let Some(tray) = &self.tray {
             tray.set_activity(Some(format!("{title} {names}")));
         }
@@ -182,7 +179,7 @@ impl DactApp {
                 .map(|outs| {
                     let note = extra
                         .quality
-                        .map(|q| format!("quality {q}"))
+                        .map(crate::i18n::quality_note)
                         .unwrap_or_default();
                     report::summarize(&action, &srcs, &outs, &note)
                 })
@@ -224,18 +221,18 @@ impl DactApp {
                 self.submit(action, paths, ActionExtra::default());
             } else {
                 self.toasts.info(
-                    "FFmpeg is ready",
-                    "Video and audio conversion is available.",
+                    crate::i18n::ffmpeg_ready_title(),
+                    crate::i18n::ffmpeg_ready_body(),
                 );
             }
             return;
         }
         if let Some(tray) = &self.tray {
-            tray.set_activity(Some("Getting FFmpeg…".into()));
+            tray.set_activity(Some(crate::i18n::getting_ffmpeg().into()));
         }
         let toast = self.toasts.working(
-            "Getting FFmpeg…",
-            "Downloading a static build into this user folder.",
+            crate::i18n::getting_ffmpeg(),
+            crate::i18n::getting_ffmpeg_detail(),
         );
         let tx = self.job_tx.clone();
         std::thread::Builder::new()
@@ -304,8 +301,8 @@ impl DactApp {
         if !self.tray_hinted {
             self.tray_hinted = true;
             self.toasts.info(
-                "DAct is in the tray",
-                "Conversions keep running. Open the window from the tray icon. Quit only from there.",
+                crate::i18n::hidden_title(),
+                crate::i18n::hidden_body(),
             );
         }
     }
@@ -395,11 +392,8 @@ impl eframe::App for DactApp {
             } else if msg.show {
                 self.reveal(ctx);
                 self.toasts.info(
-                    "DAct is already running",
-                    format!(
-                        "It is in the tray. Hold {} and press the left mouse button, or open the window from the tray icon.",
-                        self.settings.trigger.label()
-                    ),
+                    crate::i18n::already_running(),
+                    crate::i18n::already_running_body(self.settings.trigger.label()),
                 );
             }
         }
@@ -458,7 +452,7 @@ impl eframe::App for DactApp {
                     self.clear_activity();
                     match result {
                         Ok(card) => self.toasts.finish_ok(toast, card),
-                        Err(e) => self.toasts.finish_err(toast, "Couldn't finish", e),
+                        Err(e) => self.toasts.finish_err(toast, crate::i18n::couldnt_finish(), e),
                     }
                 }
                 JobDone::Progress {
@@ -486,9 +480,9 @@ impl eframe::App for DactApp {
                         self.toasts.finish_ok(
                             toast,
                             ResultCard {
-                                title: "FFmpeg ready".into(),
+                                title: crate::i18n::ffmpeg_ready_title().into(),
                                 detail: path.display().to_string(),
-                                good: "Video and audio conversion is available.".into(),
+                                good: crate::i18n::ffmpeg_ready_body().into(),
                                 outs: vec![],
                                 srcs: vec![],
                             },
@@ -499,7 +493,7 @@ impl eframe::App for DactApp {
                     }
                     Err(e) => {
                         self.clear_activity();
-                        self.toasts.finish_err(toast, "Couldn't get FFmpeg", e);
+                        self.toasts.finish_err(toast, crate::i18n::couldnt_get_ffmpeg(), e);
                     }
                 },
             }
@@ -515,7 +509,18 @@ impl eframe::App for DactApp {
             match ev {
                 TriggerEvent::Show { pos, files } => {
                     self.radial.open_at(pos, None, vec![]);
+                    let files = if files.is_empty() {
+                        self.queue.clone()
+                    } else {
+                        files
+                    };
                     if !files.is_empty() {
+                        let rings = convert::build_rings(&files, &self.settings);
+                        self.radial.load_paths(files, rings);
+                    }
+                }
+                TriggerEvent::Files(files) => {
+                    if self.radial.visible && self.radial.paths.is_empty() && !files.is_empty() {
                         let rings = convert::build_rings(&files, &self.settings);
                         self.radial.load_paths(files, rings);
                     }
@@ -697,6 +702,7 @@ impl eframe::App for DactApp {
             }
         } else {
             let pos = self.radial.pos - egui::vec2(SIZE * 0.5, SIZE * 0.5);
+            let trigger = self.settings.trigger.label().to_string();
             ctx.show_viewport_immediate(
                 radial_id,
                 ViewportBuilder::default()
@@ -706,11 +712,17 @@ impl eframe::App for DactApp {
                     .with_transparent(true)
                     .with_always_on_top()
                     .with_taskbar(false)
-                    .with_active(false)
+                    .with_active(cfg!(target_os = "macos"))
                     .with_drag_and_drop(true)
                     .with_inner_size([SIZE, SIZE])
                     .with_position([pos.x, pos.y]),
                 |ctx, _class| {
+                    ctx.send_viewport_cmd(ViewportCommand::InnerSize(egui::vec2(SIZE, SIZE)));
+                    ctx.send_viewport_cmd(ViewportCommand::OuterPosition(pos));
+                    ctx.send_viewport_cmd(ViewportCommand::Visible(true));
+                    ctx.send_viewport_cmd(ViewportCommand::WindowLevel(
+                        egui::WindowLevel::AlwaysOnTop,
+                    ));
                     ctx.send_viewport_cmd(ViewportCommand::EnableButtons {
                         close: false,
                         minimized: false,
@@ -723,7 +735,7 @@ impl eframe::App for DactApp {
                         .order(egui::Order::Foreground)
                         .show(ctx, |ui| {
                             ui.set_min_size(egui::vec2(SIZE, SIZE));
-                            if let Some((item, paths, _)) = self.radial.show(ui, dt) {
+                            if let Some((item, paths, _)) = self.radial.show(ui, dt, &trigger) {
                                 self.activate(item, paths);
                             }
                         });
@@ -754,7 +766,8 @@ impl eframe::App for DactApp {
         }
 
         if self.radial.visible {
-            ctx.request_repaint_after(Duration::from_millis(16));
+            // Immediate frames so the first macOS overlay paint is not skipped.
+            ctx.request_repaint();
         } else if self.toasts.needs_spin() {
             ctx.request_repaint_after(Duration::from_millis(50));
         } else if !self.toasts.is_empty() {
@@ -779,22 +792,6 @@ fn load_thumb(ctx: &egui::Context, path: &std::path::Path) -> Option<TextureHand
     let size = [rgba.width() as usize, rgba.height() as usize];
     let color = egui::ColorImage::from_rgba_unmultiplied(size, rgba.as_raw());
     Some(ctx.load_texture("dact-thumb", color, egui::TextureOptions::LINEAR))
-}
-
-fn working_label(action: &str) -> String {
-    let (kind, name) = action.split_once(':').unwrap_or(("", action));
-    match (kind, name) {
-        ("convert", n) | ("media", n) => format!("Converting to {n}…"),
-        ("extract", n) => format!("Extracting {n}…"),
-        ("tool", "Compress") => "Compressing…".into(),
-        ("tool", "Resize") => "Resizing…".into(),
-        ("tool", "Rotate") => "Rotating…".into(),
-        ("tool", "Split") => "Splitting…".into(),
-        ("tool", "Merge") => "Merging…".into(),
-        ("tool", "Extract") => "Extracting images…".into(),
-        ("tool", "Metadata") => "Stripping metadata…".into(),
-        _ => "Working…".into(),
-    }
 }
 
 pub fn run_ui(initial_files: Vec<PathBuf>, quiet: bool) -> eframe::Result<()> {

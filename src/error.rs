@@ -7,19 +7,19 @@ use thiserror::Error;
 pub enum DactError {
     #[error("{0}")]
     User(String),
-    #[error("The file was moved or deleted: {0}")]
+    #[error("Файл перенесли или удалили: {0}")]
     Missing(PathBuf),
-    #[error("No permission to write next to this file. Try a folder you own, or set Settings → Save results → subfolder.")]
+    #[error("Нет прав записать рядом с этим файлом. Выберите свою папку или в Настройках включите сохранение в подпапку DAct.")]
     Permission,
-    #[error("This file isn't a format DAct can read.")]
+    #[error("DAct не читает этот формат.")]
     Unsupported,
-    #[error("FFmpeg is not available. Press Get FFmpeg, or set its path in Settings.")]
+    #[error("FFmpeg не найден. Нажмите «Скачать FFmpeg» или укажите путь в Настройках.")]
     NoFfmpeg,
-    #[error("FFmpeg could not convert this file with the selected format.")]
+    #[error("FFmpeg не смог перекодировать файл в выбранный формат.")]
     FfmpegFailed,
-    #[error("This file has no audio stream to convert.")]
+    #[error("В этом файле нет звуковой дорожки.")]
     NoAudio,
-    #[error("This PDF is password-protected. Remove the password first.")]
+    #[error("PDF защищён паролем. Сначала снимите защиту.")]
     PdfLocked,
     #[error("{0}")]
     Other(#[from] anyhow::Error),
@@ -33,7 +33,7 @@ impl DactError {
     pub fn from_io(err: std::io::Error) -> Self {
         match err.kind() {
             std::io::ErrorKind::PermissionDenied => Self::Permission,
-            std::io::ErrorKind::NotFound => Self::User("The file was moved or deleted.".into()),
+            std::io::ErrorKind::NotFound => Self::User(crate::i18n::err_file_gone().into()),
             _ => Self::User(err.to_string()),
         }
     }

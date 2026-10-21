@@ -9,7 +9,7 @@ pub fn unique_path(path: impl AsRef<Path>) -> PathBuf {
     if !path.exists() {
         return path.to_path_buf();
     }
-    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("file");
+    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("файл");
     let ext = path
         .extension()
         .and_then(|s| s.to_str())
@@ -52,7 +52,7 @@ pub fn sibling(
 ) -> Result<PathBuf> {
     let src = src.as_ref();
     let dir = output_dir(src, mode)?;
-    let stem = src.file_stem().and_then(|s| s.to_str()).unwrap_or("file");
+    let stem = src.file_stem().and_then(|s| s.to_str()).unwrap_or("файл");
     let stem = if label.is_empty() {
         stem.to_string()
     } else {
@@ -64,9 +64,9 @@ pub fn sibling(
 
 pub fn human_size(n: u64) -> String {
     if n < 1024 {
-        return format!("{n} B");
+        return format!("{n} Б");
     }
-    let units = ["KB", "MB", "GB"];
+    let units = ["КБ", "МБ", "ГБ"];
     let mut f = n as f64;
     for (i, unit) in units.iter().enumerate() {
         f /= 1024.0;
@@ -74,7 +74,7 @@ pub fn human_size(n: u64) -> String {
             return format!("{f:.1} {unit}");
         }
     }
-    format!("{f:.1} GB")
+    format!("{f:.1} ГБ")
 }
 
 pub fn file_size(path: impl AsRef<Path>) -> u64 {
@@ -144,7 +144,7 @@ mod tests {
 
     #[test]
     fn sizes_format() {
-        assert_eq!(human_size(800), "800 B");
-        assert_eq!(human_size(1536), "1.5 KB");
+        assert_eq!(human_size(800), "800 Б");
+        assert_eq!(human_size(1536), "1.5 КБ");
     }
 }

@@ -20,7 +20,7 @@ pub fn summarize(action: &str, srcs: &[PathBuf], outs: &[PathBuf], extra: &str) 
         return ResultCard {
             title: action.to_string(),
             detail: if extra.is_empty() {
-                "Nothing was written".into()
+                crate::i18n::nothing_written().into()
             } else {
                 extra.into()
             },
@@ -32,26 +32,26 @@ pub fn summarize(action: &str, srcs: &[PathBuf], outs: &[PathBuf], extra: &str) 
     let o0 = &outs[0];
     if kind == "convert" || kind == "media" || kind == "extract" {
         let title = if srcs.len() > 1 && outs.len() == 1 {
-            format!("{} files → 1 {name}", srcs.len())
+            crate::i18n::files_to_one(srcs.len(), name)
         } else if outs.len() > 1 && srcs.len() == 1 {
-            format!("{} pages → {} {name}s", outs.len(), outs.len())
+            crate::i18n::pages_to_files(outs.len(), name)
         } else if outs.len() > 1 {
-            format!("{} files → {name}", outs.len())
+            crate::i18n::files_to_fmt(outs.len(), name)
         } else if let Some(src) = srcs.first() {
-            format!(
-                "{} → {name}",
-                src.extension()
+            crate::i18n::ext_to_fmt(
+                &src.extension()
                     .and_then(|e| e.to_str())
-                    .unwrap_or("file")
-                    .to_ascii_uppercase()
+                    .unwrap_or(crate::i18n::fallback_file())
+                    .to_ascii_uppercase(),
+                name,
             )
         } else {
-            format!("Converted to {name}")
+            crate::i18n::converted_to(name)
         };
         let mut bits = vec![if outs.len() == 1 {
             file_name(o0)
         } else {
-            format!("{} files", outs.len())
+            crate::i18n::files_n(outs.len())
         }];
         if category(o0) == Some(Category::Image) {
             if let Some((w, h)) = image_dims(o0) {
@@ -82,9 +82,9 @@ pub fn summarize(action: &str, srcs: &[PathBuf], outs: &[PathBuf], extra: &str) 
         };
         return ResultCard {
             title: if srcs.len() > 1 {
-                format!("Compressed {} files", srcs.len())
+                crate::i18n::compressed_n(srcs.len())
             } else {
-                "Compressed".into()
+                crate::i18n::compressed_title().into()
             },
             detail,
             good: verdict,
@@ -94,10 +94,18 @@ pub fn summarize(action: &str, srcs: &[PathBuf], outs: &[PathBuf], extra: &str) 
     }
 
     if matches!(name, "Resize" | "Rotate") {
-        let verb = if name == "Resize" { "Resized" } else { "Rotated" };
+        let title = if name == "Resize" {
+            crate::i18n::resized_title()
+        } else {
+            crate::i18n::rotated_title()
+        };
         if outs.len() > 1 {
             return ResultCard {
-                title: format!("{verb} {} images", outs.len()),
+                title: if name == "Resize" {
+                    crate::i18n::resized_n(outs.len())
+                } else {
+                    crate::i18n::rotated_n(outs.len())
+                },
                 detail: format!("{} → {}", human_size(before), human_size(after)),
                 good: String::new(),
                 outs: outs.to_vec(),
@@ -122,7 +130,7 @@ pub fn summarize(action: &str, srcs: &[PathBuf], outs: &[PathBuf], extra: &str) 
         }
         detail.push_str(&file_name(o0));
         return ResultCard {
-            title: verb.into(),
+            title: title.into(),
             detail,
             good: String::new(),
             outs: outs.to_vec(),
@@ -131,24 +139,20 @@ pub fn summarize(action: &str, srcs: &[PathBuf], outs: &[PathBuf], extra: &str) 
     }
 
     let title = match name {
-        "Metadata" => "Metadata removed",
+        "Metadata" => crate::i18n::metadata_removed(),
         "Split" => {
             return ResultCard {
-                title: format!("Split into {} PDFs", outs.len()),
+                title: crate::i18n::split_into(outs.len()),
                 detail: format!("{} …", file_name(o0)),
                 good: String::new(),
                 outs: outs.to_vec(),
                 srcs: srcs.to_vec(),
             }
         }
-        "Merge" => "Merged PDFs",
+        "Merge" => crate::i18n::merged_pdfs(),
         "Extract" => {
             return ResultCard {
-                title: format!(
-                    "Extracted {} image{}",
-                    outs.len(),
-                    if outs.len() == 1 { "" } else { "s" }
-                ),
+                title: crate::i18n::extracted_images(outs.len()),
                 detail: human_size(after),
                 good: String::new(),
                 outs: outs.to_vec(),
@@ -162,7 +166,7 @@ pub fn summarize(action: &str, srcs: &[PathBuf], outs: &[PathBuf], extra: &str) 
         title: title.into(),
         detail: format!("{} · {}", file_name(o0), human_size(after)),
         good: if name == "Metadata" {
-            "private copy".into()
+            crate::i18n::private_copy().into()
         } else {
             String::new()
         },
@@ -185,11 +189,11 @@ fn size_change(before: u64, after: u64) -> (String, String) {
     }
     let pct = (1.0 - after as f64 / before as f64) * 100.0;
     if pct >= 1.0 {
-        (text, format!("{pct:.0}% smaller"))
+        (text, crate::i18n::pct_smaller(pct))
     } else if pct <= -1.0 {
-        (text, "already well compressed".into())
+        (text, crate::i18n::already_small().into())
     } else {
-        (text, "same size".into())
+        (text, crate::i18n::same_size().into())
     }
 }
 

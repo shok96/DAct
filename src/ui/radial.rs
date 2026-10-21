@@ -153,13 +153,13 @@ impl RadialMenu {
 
     pub fn hub_text(&self) -> String {
         if self.paths.is_empty() {
-            return "Drop a file".into();
+            return crate::i18n::drop_file().into();
         }
         if crate::category::uniform(&self.paths).is_none() {
-            return "One type only".into();
+            return crate::i18n::one_type_only().into();
         }
         if self.paths.len() > 1 {
-            return format!("{} files", self.paths.len());
+            return crate::i18n::files_n(self.paths.len());
         }
         human_size(file_size(&self.paths[0]))
     }
@@ -184,11 +184,23 @@ impl RadialMenu {
         &mut self,
         ui: &mut egui::Ui,
         dt: f32,
+        trigger: &str,
     ) -> Option<(MenuItem, Vec<PathBuf>, bool)> {
         self.tick(dt);
-        let t = (self.opened_at.elapsed().as_secs_f32() / 0.22).clamp(0.0, 1.0);
-        let ease = 1.0 - (1.0 - t).powi(3);
-        let scale = 0.82 + 0.18 * ease;
+        // On macOS the first overlay frames can miss the mesh; skip the fade
+        // so slices are fully opaque as soon as the surface is ready.
+        let fade_ms = if cfg!(target_os = "macos") { 0.06 } else { 0.22 };
+        let t = (self.opened_at.elapsed().as_secs_f32() / fade_ms).clamp(0.0, 1.0);
+        let ease = if cfg!(target_os = "macos") {
+            1.0
+        } else {
+            1.0 - (1.0 - t).powi(3)
+        };
+        let scale = if cfg!(target_os = "macos") {
+            1.0
+        } else {
+            0.82 + 0.18 * ease
+        };
         let (rect, response) = ui.allocate_exact_size(Vec2::splat(SIZE), Sense::click_and_drag());
         let center = rect.center();
         if self.click_mode {
@@ -209,7 +221,7 @@ impl RadialMenu {
             }
         }
 
-        paint_dial(ui.painter(), center, self, scale, ease);
+        paint_dial(ui.painter(), center, self, scale, ease, trigger);
 
         let mut activate = None;
         if self.click_mode && response.clicked() {
@@ -238,7 +250,14 @@ fn dummy_close() -> MenuItem {
     }
 }
 
-fn paint_dial(painter: &egui::Painter, center: Pos2, menu: &RadialMenu, scale: f32, fade: f32) {
+fn paint_dial(
+    painter: &egui::Painter,
+    center: Pos2,
+    menu: &RadialMenu,
+    scale: f32,
+    fade: f32,
+    trigger: &str,
+) {
     let items = menu.items();
     let n = items.len();
 
@@ -350,22 +369,17 @@ fn paint_dial(painter: &egui::Painter, center: Pos2, menu: &RadialMenu, scale: f
         theme::TEXT.gamma_multiply(fade),
     );
 
-    let hint = match menu.hover {
-        Hit::Slice(i) => items.get(i).map(|it| it.hint.as_str()).unwrap_or(""),
-        Hit::Hub if menu.rings.len() > 1 => "Tap to switch ring",
-        _ => {
-            if menu.file_name().is_empty() {
-                "Alt + left click"
-            } else {
-                "Release on a slice"
-            }
-        }
+    let chord = crate::i18n::chord(trigger);
+    let hint_owned = match menu.hover {
+        Hit::Slice(i) => items.get(i).map(|it| it.hint.clone()).unwrap_or_default(),
+        _ if menu.file_name().is_empty() => chord,
+        _ => String::new(),
     };
-    if !hint.is_empty() {
+    if !hint_owned.is_empty() {
         painter.text(
             center + Vec2::new(0.0, 20.0),
             Align2::CENTER_CENTER,
-            hint,
+            hint_owned,
             FontId::new(10.0, FontFamily::Proportional),
             theme::TEXT_DIM.gamma_multiply(fade),
         );

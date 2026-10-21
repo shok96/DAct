@@ -86,7 +86,7 @@ pub fn extract_docx_text(src: &Path) -> Result<String> {
     let mut archive = zip::ZipArchive::new(file).map_err(|e| DactError::user(e.to_string()))?;
     let mut xml = archive
         .by_name("word/document.xml")
-        .map_err(|_| DactError::user("This Word file is damaged or not a .docx."))?;
+        .map_err(|_| DactError::user(crate::i18n::err_docx_bad()))?;
     let mut raw = String::new();
     std::io::Read::read_to_string(&mut xml, &mut raw).map_err(DactError::from_io)?;
     Ok(strip_docx_xml(&raw))

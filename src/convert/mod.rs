@@ -44,13 +44,13 @@ impl JobProgress {
             .current
             .file_name()
             .map(|s| s.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "file".into());
+            .unwrap_or_else(|| crate::i18n::fallback_file().into());
         let pct = (self.fraction() * 100.0).round() as u32;
         let n = (self.completed + 1).min(self.total.max(1));
         if self.total > 1 {
-            format!("{n} / {}  ·  {name}  ·  {pct}%", self.total)
+            crate::i18n::progress_many(n, self.total, &name, pct)
         } else if pct > 0 {
-            format!("{name}  ·  {pct}%")
+            crate::i18n::progress_one(&name, pct)
         } else {
             name
         }
@@ -63,13 +63,13 @@ pub fn build_rings(paths: &[PathBuf], settings: &Settings) -> Vec<Ring> {
     };
     if category::uniform(paths).is_none() {
         return vec![Ring {
-            name: "One type only".into(),
+            name: crate::i18n::ring_one_type().into(),
             items: vec![],
         }];
     }
     let Some(cat) = category(first) else {
         return vec![Ring {
-            name: "Unsupported".into(),
+            name: crate::i18n::ring_unsupported().into(),
             items: vec![],
         }];
     };
@@ -77,11 +77,11 @@ pub fn build_rings(paths: &[PathBuf], settings: &Settings) -> Vec<Ring> {
 
     match cat {
         Category::Audio => vec![Ring {
-            name: "Audio".into(),
+            name: crate::i18n::ring_audio().into(),
             items: media::audio_targets(first)
                 .into_iter()
                 .map(|n| MenuItem {
-                    hint: "Local FFmpeg".into(),
+                    hint: crate::i18n::hint_ffmpeg().into(),
                     key: format!("media:{n}"),
                     label: n,
                 })
@@ -89,23 +89,30 @@ pub fn build_rings(paths: &[PathBuf], settings: &Settings) -> Vec<Ring> {
         }],
         Category::Video => {
             let mut rings = vec![Ring {
-                name: "Video".into(),
+                name: crate::i18n::ring_video().into(),
                 items: media::video_targets(first)
                     .into_iter()
-                    .map(|n| MenuItem {
-                        hint: "Local FFmpeg".into(),
-                        key: format!("media:{n}"),
-                        label: n,
+                    .map(|n| {
+                        let hint = crate::i18n::format_hint(&n);
+                        MenuItem {
+                            hint: if hint.is_empty() {
+                                crate::i18n::hint_ffmpeg().into()
+                            } else {
+                                hint.into()
+                            },
+                            key: format!("media:{n}"),
+                            label: n,
+                        }
                     })
                     .collect(),
             }];
             rings.push(Ring {
-                name: "Extract".into(),
+                name: crate::i18n::ring_extract().into(),
                 items: ["MP3", "AAC", "FLAC"]
                     .into_iter()
                     .map(|n| MenuItem {
                         label: n.into(),
-                        hint: "Audio only".into(),
+                        hint: crate::i18n::hint_audio_only().into(),
                         key: format!("extract:{n}"),
                     })
                     .collect(),
@@ -117,9 +124,9 @@ pub fn build_rings(paths: &[PathBuf], settings: &Settings) -> Vec<Ring> {
             let mut convert = Vec::new();
             for t in image::targets_for(first) {
                 let hint = if t == "PDF" && same.len() > 1 {
-                    format!("{} images → 1 PDF", same.len())
+                    crate::i18n::images_to_pdf_hint(same.len())
                 } else {
-                    format_hint(&t).into()
+                    crate::i18n::format_hint(&t).into()
                 };
                 convert.push(MenuItem {
                     label: t.clone(),
@@ -129,98 +136,125 @@ pub fn build_rings(paths: &[PathBuf], settings: &Settings) -> Vec<Ring> {
             }
             vec![
                 Ring {
-                    name: "Convert".into(),
+                    name: crate::i18n::ring_convert().into(),
                     items: convert,
                 },
                 Ring {
-                    name: "Tools".into(),
+                    name: crate::i18n::ring_tools().into(),
                     items: tool_items(&[
-                        ("Compress", "Shrink file size"),
-                        ("Resize", "Change dimensions"),
-                        ("Rotate", "Turn 90°"),
-                        ("Metadata", "Strip camera / GPS"),
+                        (
+                            crate::i18n::tool_compress(),
+                            crate::i18n::hint_compress_image(),
+                            "Compress",
+                        ),
+                        (
+                            crate::i18n::tool_resize(),
+                            crate::i18n::hint_resize(),
+                            "Resize",
+                        ),
+                        (
+                            crate::i18n::tool_rotate(),
+                            crate::i18n::hint_rotate(),
+                            "Rotate",
+                        ),
+                        (
+                            crate::i18n::tool_metadata(),
+                            crate::i18n::hint_metadata_image(),
+                            "Metadata",
+                        ),
                     ]),
                 },
             ]
         }
         Category::Pdf => {
             let mut tools = vec![
-                ("Compress", "Rewrite, drop unused objects"),
-                ("Split", "One PDF per page"),
-                ("Rotate", "Turn pages 90°"),
+                (
+                    crate::i18n::tool_compress(),
+                    crate::i18n::hint_compress_pdf(),
+                    "Compress",
+                ),
+                (
+                    crate::i18n::tool_split(),
+                    crate::i18n::hint_split(),
+                    "Split",
+                ),
+                (
+                    crate::i18n::tool_rotate(),
+                    crate::i18n::hint_rotate_pdf(),
+                    "Rotate",
+                ),
             ];
             if same.len() > 1 {
-                tools.insert(3, ("Merge", "Join into one PDF"));
+                tools.insert(
+                    3,
+                    (
+                        crate::i18n::tool_merge(),
+                        crate::i18n::hint_merge(),
+                        "Merge",
+                    ),
+                );
             }
             tools.extend([
-                ("Extract", "Save embedded images"),
-                ("Metadata", "Private copy"),
+                (
+                    crate::i18n::tool_extract(),
+                    crate::i18n::hint_extract(),
+                    "Extract",
+                ),
+                (
+                    crate::i18n::tool_metadata(),
+                    crate::i18n::hint_metadata_pdf(),
+                    "Metadata",
+                ),
             ]);
             vec![
                 Ring {
-                    name: "Convert".into(),
+                    name: crate::i18n::ring_convert().into(),
                     items: pdf::pdf_targets()
                         .into_iter()
                         .map(|t| MenuItem {
-                            hint: "Extract text".into(),
+                            hint: crate::i18n::hint_extract_text().into(),
                             key: format!("convert:{t}"),
                             label: t,
                         })
                         .collect(),
                 },
                 Ring {
-                    name: "Tools".into(),
+                    name: crate::i18n::ring_tools().into(),
                     items: tool_items(&tools),
                 },
             ]
         }
         Category::Text => vec![Ring {
-            name: "Convert".into(),
+            name: crate::i18n::ring_convert().into(),
             items: ["PDF", "DOCX"]
                 .into_iter()
                 .map(|t| MenuItem {
-                    hint: format_hint(t).into(),
+                    hint: crate::i18n::format_hint(t).into(),
                     key: format!("convert:{t}"),
                     label: t.into(),
                 })
                 .collect(),
         }],
         Category::Docx => vec![Ring {
-            name: "Convert".into(),
+            name: crate::i18n::ring_convert().into(),
             items: vec![MenuItem {
                 label: "TXT".into(),
-                hint: "Plain text".into(),
+                hint: crate::i18n::hint_plain_text().into(),
                 key: "convert:TXT".into(),
             }],
         }],
     }
 }
 
-fn tool_items(items: &[(&str, &str)]) -> Vec<MenuItem> {
+fn tool_items(items: &[(&str, &str, &str)]) -> Vec<MenuItem> {
     items
         .iter()
-        .map(|(label, hint)| MenuItem {
+        .map(|(label, hint, key)| MenuItem {
             label: (*label).into(),
             hint: (*hint).into(),
-            key: format!("tool:{label}"),
+            key: format!("tool:{key}"),
         })
         .collect()
-}
-
-fn format_hint(target: &str) -> &'static str {
-    match target {
-        "JPG" => "Small, universal",
-        "PNG" => "Lossless · transparency",
-        "WEBP" => "Small for the web",
-        "TIFF" => "Print · archival",
-        "BMP" => "Uncompressed",
-        "PDF" => "Document",
-        "ICO" => "Windows icon",
-        "GIF" => "Legacy web",
-        "DOCX" => "Editable Word",
-        "TXT" => "Plain text",
-        _ => "",
-    }
 }
 
 pub fn run_action(
@@ -240,15 +274,13 @@ pub fn run_action_with_progress(
     mut on_progress: Option<&mut dyn FnMut(JobProgress)>,
 ) -> Result<Vec<PathBuf>> {
     let Some(first) = paths.first() else {
-        return Err(DactError::user("No files."));
+        return Err(DactError::user(crate::i18n::err_no_files()));
     };
     let Some(cat) = category::uniform(paths) else {
         if paths.iter().any(|p| category(p).is_none()) {
             return Err(DactError::Unsupported);
         }
-        return Err(DactError::user(
-            "Select files of one type — images, or video, or audio, or PDF.",
-        ));
+        return Err(DactError::user(crate::i18n::err_one_type()));
     };
     let (kind, name) = key.split_once(':').unwrap_or(("", key));
     let total = paths.len();
@@ -309,7 +341,7 @@ pub fn run_action_with_progress(
             tick(paths.len(), paths.last().unwrap_or(first), 1.0);
             Ok(outs)
         }
-        _ => Err(DactError::user("Unknown action.")),
+        _ => Err(DactError::user(crate::i18n::err_unknown_action())),
     }
 }
 
@@ -320,9 +352,7 @@ fn convert_one(src: &Path, cat: Category, target: &str, settings: &Settings) -> 
         (Category::Text, "PDF") => Ok(vec![text::text_to_pdf(src, settings)?]),
         (Category::Text, "DOCX") => Ok(vec![text::text_to_docx(src, settings)?]),
         (Category::Docx, "TXT") => Ok(vec![text::docx_to_txt(src, settings)?]),
-        _ => Err(DactError::user(format!(
-            "Can't convert this file to {target}."
-        ))),
+        _ => Err(DactError::user(crate::i18n::err_cant_convert(target))),
     }
 }
 
@@ -405,7 +435,7 @@ fn run_tool(
             }
             Ok(outs)
         }
-        _ => Err(DactError::user(format!("Tool {name} is not available."))),
+        _ => Err(DactError::user(crate::i18n::err_tool_missing(name))),
     }
 }
 
@@ -417,7 +447,7 @@ fn strip_pdf_metadata(src: &Path, settings: &Settings) -> Result<PathBuf> {
             dict.remove(b"Metadata");
         }
     }
-    let out = crate::paths::sibling(src, "Clean", "pdf", settings.output)?;
+    let out = crate::paths::sibling(src, crate::i18n::suffix_clean(), "pdf", settings.output)?;
     doc.save(&out)
         .map_err(|e| DactError::user(e.to_string()))?;
     Ok(out)

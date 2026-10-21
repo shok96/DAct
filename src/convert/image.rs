@@ -127,7 +127,7 @@ pub fn encode_image(img: &DynamicImage, target: &str, quality: u8) -> Result<Vec
         "PDF" => {
             buf = crate::convert::pdf::image_bytes_to_pdf(&flatten(img).to_rgb8())?;
         }
-        other => return Err(DactError::user(format!("Unknown image target {other}"))),
+        other => return Err(DactError::user(crate::i18n::err_unknown_image(other))),
     }
     Ok(buf)
 }
@@ -147,13 +147,13 @@ pub fn image_to(src: &Path, target: &str, settings: &Settings) -> Result<PathBuf
 
 pub fn images_to_single_pdf(srcs: &[PathBuf], settings: &Settings) -> Result<PathBuf> {
     if srcs.is_empty() {
-        return Err(DactError::user("No images to combine."));
+        return Err(DactError::user(crate::i18n::err_no_images_combine()));
     }
     let mut pages = Vec::new();
     for src in srcs {
         pages.push(flatten(&open_image_any(src, settings)?).to_rgb8());
     }
-    let out = sibling(&srcs[0], "Combined", "pdf", settings.output)?;
+    let out = sibling(&srcs[0], crate::i18n::suffix_combined(), "pdf", settings.output)?;
     let bytes = crate::convert::pdf::images_to_pdf(&pages)?;
     atomic_write(&out, &bytes)?;
     Ok(out)
@@ -172,7 +172,7 @@ pub fn compress_image(src: &Path, quality: u8, settings: &Settings) -> Result<Pa
         "jpg" | "jpeg" => ("JPG", "jpg"),
         _ => ("JPG", "jpg"),
     };
-    let out = sibling(src, "Compressed", out_ext, settings.output)?;
+    let out = sibling(src, crate::i18n::suffix_compressed(), out_ext, settings.output)?;
     if target == "PNG" {
         let colors = (quality as u32 * 256 / 100).clamp(16, 256) as usize;
         let quantized = quantize_rgba(&img.to_rgba8(), colors);
@@ -243,7 +243,7 @@ pub fn rotate_image(src: &Path, settings: &Settings) -> Result<PathBuf> {
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("png");
-    let out = sibling(src, "Rotated", ext, settings.output)?;
+    let out = sibling(src, crate::i18n::suffix_rotated(), ext, settings.output)?;
     let target = crate::category::normalize_label(ext);
     atomic_write(&out, &encode_image(&img, &target, settings.jpg_quality())?)?;
     Ok(out)
@@ -255,7 +255,7 @@ pub fn strip_metadata(src: &Path, settings: &Settings) -> Result<PathBuf> {
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("png");
-    let out = sibling(src, "Clean", ext, settings.output)?;
+    let out = sibling(src, crate::i18n::suffix_clean(), ext, settings.output)?;
     let target = crate::category::normalize_label(ext);
     atomic_write(&out, &encode_image(&img, &target, settings.jpg_quality())?)?;
     Ok(out)
@@ -264,7 +264,7 @@ pub fn strip_metadata(src: &Path, settings: &Settings) -> Result<PathBuf> {
 pub fn read_metadata(src: &Path) -> Vec<(String, String)> {
     let mut rows = Vec::new();
     if let Ok((w, h)) = image::image_dimensions(src) {
-        rows.push(("Size".into(), format!("{w} × {h}")));
+        rows.push((crate::i18n::meta_size().into(), format!("{w} × {h}")));
     }
     if let Ok(bytes) = fs::read(src) {
         let mut reader = std::io::Cursor::new(bytes);
@@ -292,7 +292,7 @@ pub fn read_metadata(src: &Path) -> Vec<(String, String)> {
         }
     }
     if rows.len() == 1 {
-        rows.push(("Metadata".into(), "none stored".into()));
+        rows.push((crate::i18n::meta_label().into(), crate::i18n::meta_none().into()));
     }
     rows
 }
