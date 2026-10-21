@@ -2,7 +2,7 @@
 name = "dact"
 version = "0.1.0"
 edition = "2021"
-description = "Windows tray file converter. Hold Alt and click a file."
+description = "Convert files with a radial menu: hold Alt, press the left mouse button, release on a slice. Windows, macOS and Linux."
 license = "MIT"
 authors = ["Roma Kosyachenko"]
 repository = "https://github.com/shok96/DAct"
