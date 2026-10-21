@@ -1,0 +1,58 @@
+[package]
+name = "dact"
+version = "0.1.0"
+edition = "2021"
+description = "Windows tray file converter. Hold Alt and click a file."
+license = "MIT"
+authors = ["Roma Kosyachenko"]
+repository = "https://github.com/shok96/DAct"
+readme = "README.md"
+keywords = ["converter", "image", "pdf", "ffmpeg", "desktop"]
+categories = ["multimedia", "command-line-utilities"]
+
+[dependencies]
+anyhow = "1"
+device_query = "2"
+dirs = "6"
+docx-rs = "0.4"
+eframe = "0.32"
+egui = "0.32"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "tiff", "webp", "ico"] }
+kamadak-exif = "0.6"
+lopdf = "0.34"
+open = "5"
+pdf-extract = "0.8"
+rfd = "0.15"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+toml = "0.8"
+trash = "5"
+tray-icon = "0.21"
+ureq = { version = "2", default-features = false, features = ["tls"] }
+which = "7"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Gdi",
+    "Win32_System_Com",
+    "Win32_System_Console",
+    "Win32_System_Ole",
+    "Win32_System_Variant",
+    "Win32_UI_Controls",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
