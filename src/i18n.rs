@@ -551,6 +551,10 @@ pub fn resize_value() -> &'static str {
     "значение"
 }
 
+pub fn app_version(version: &str) -> String {
+    format!("Версия {version}")
+}
+
 pub fn tray_show() -> &'static str {
     "Показать DAct"
 }

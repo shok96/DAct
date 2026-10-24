@@ -119,7 +119,7 @@ impl SettingsWin {
                 }
                 ui.add_space(6.0);
                 ui.label(
-                    RichText::new(format!("DAct {}", crate::VERSION))
+                    RichText::new(crate::i18n::app_version(crate::VERSION))
                         .color(theme::TEXT_DIM)
                         .size(11.0),
                 );

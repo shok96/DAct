@@ -1,5 +1,6 @@
 [package]
 name = "dact"
+# Bump only when the user asks.
 version = "0.1.0"
 edition = "2021"
 description = "Конвертация файлов кольцевым меню: удерживайте Alt / Option, нажмите кнопку мыши, отпустите на секторе. Windows, macOS и Linux."
